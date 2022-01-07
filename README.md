@@ -2,7 +2,7 @@
 Elastic Net Regression algorithm written in C sharp (beta)
 
 # Dependencies
-ILGPU(https://github.com/m4rs-mt/ILGPU)
+- ILGPU: (https://github.com/m4rs-mt/ILGPU)
 
 # Future Plans
 - Transition to move GPU friendly code
