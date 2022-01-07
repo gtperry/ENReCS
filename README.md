@@ -7,5 +7,5 @@ Elastic Net Regression algorithm written in C sharp (beta)
 # Future Plans
 - Transition to move GPU friendly code
 - Improve runtime by utilizing ILGPU library
-- Fix bugs involved in using multiple input/output columns
+- Fix bugs when using multiple input/output columns
 - Have it take in csv/alternate inputs
