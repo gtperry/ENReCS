@@ -1,0 +1,5 @@
+/Users/griffinperry/Projects/ElasticNetRegression/obj/Debug/net6.0/ElasticNetRegression.csproj.AssemblyReference.cache
+/Users/griffinperry/Projects/ElasticNetRegression/obj/Debug/net6.0/ElasticNetRegression.GeneratedMSBuildEditorConfig.editorconfig
+/Users/griffinperry/Projects/ElasticNetRegression/obj/Debug/net6.0/ElasticNetRegression.AssemblyInfoInputs.cache
+/Users/griffinperry/Projects/ElasticNetRegression/obj/Debug/net6.0/ElasticNetRegression.AssemblyInfo.cs
+/Users/griffinperry/Projects/ElasticNetRegression/obj/Debug/net6.0/ElasticNetRegression.csproj.CoreCompileInputs.cache

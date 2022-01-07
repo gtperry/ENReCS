@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "DpejlF7UMjmbub05oc7MzYAlMh9gALDYyMHl6Pqlf7JkOmYCn2IE30582YSD9eLhTBYl1VoS/rLBmaT8kl/Kzw==",
+  "success": true,
+  "projectFilePath": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression.csproj",
+  "expectedPackageFiles": [
+    "/Users/griffinperry/.nuget/packages/ilgpu/1.0.0/ilgpu.1.0.0.nupkg.sha512",
+    "/Users/griffinperry/.nuget/packages/system.collections.immutable/5.0.0/system.collections.immutable.5.0.0.nupkg.sha512",
+    "/Users/griffinperry/.nuget/packages/system.memory/4.5.4/system.memory.4.5.4.nupkg.sha512",
+    "/Users/griffinperry/.nuget/packages/system.reflection.metadata/5.0.0/system.reflection.metadata.5.0.0.nupkg.sha512",
+    "/Users/griffinperry/.nuget/packages/system.runtime.compilerservices.unsafe/5.0.0/system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
