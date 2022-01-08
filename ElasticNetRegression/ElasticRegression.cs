@@ -114,7 +114,8 @@ namespace ElasticNetRegression
             ///<summary>Does matrix multiplication on two 2d arrays</summary>
             ///<param name="x">Array 1</param>
             ///<param name="y">Array 2</param>
-           
+
+
             //Initialize all varaibles
             int m = x.GetLength(0), n = x.GetLength(1), p = y.GetLength(0), q = y.GetLength(1), i, j;
 
@@ -142,37 +143,18 @@ namespace ElasticNetRegression
             }
             return c;
         }
+        //Predicts outputs based off of x
+
         double[,] predict(double[,] x)
-        {
-           return applyadd(matrixmul(x, this.W), this.B);
+            ///<summary>Predicts output based off of x</summary>
+            ///<param name="x">Array of inputs</param>
+        { 
+            return applyadd(matrixmul(x, this.W), this.B);
         }
-        //Helper function used for testing
-        void print1d(double[] array)
-        {
 
-            for (int j = 0; j < array.GetLength(0); j++)
-            {
-                Console.Write("{0} ", array[j]);
-            }
-
-        }
-        //Helper function used for testing
-        void print2d(double[,] array)
-        {
-            Console.Write("[");
-            for (int i = 0; i < array.GetLength(0); i++)
-            {
-                Console.Write("[");
-                for (int j = 0; j < array.GetLength(1); j++)
-                {
-                    Console.Write("{0}, ", array[i, j]);
-                }
-                Console.Write("]");
-                Console.Write(", ");
-            }
-            Console.WriteLine("]");
-        }
+        //Adds a value to each member of a 2d array
         double[,] applyadd(double[,] arr, double val)
+            ///<summary>Adds a value to each member of a 2d array</summary>
         {
             double[,] temp = new double[arr.GetLength(0), arr.GetLength(1)];
             for (int i = 0; i < arr.GetLength(0); i++)
@@ -185,8 +167,9 @@ namespace ElasticNetRegression
             return temp;
 
         }
-        
+        //Multiplies each member of a 2d array by a value
         double[,] applymul(double[,] arr, double val)
+            ///<summary>Multiplies each member of a 2d array by a value</summary>
         {
             double[,] temp = new double[arr.GetLength(0), arr.GetLength(1)];
             for (int i = 0; i < arr.GetLength(0); i++)
@@ -200,7 +183,9 @@ namespace ElasticNetRegression
 
         }
         
+        
         double[,] subtwoarrs(double[,] arr, double[,] val)
+            ///<summary>subtracts the values of an array from another one, and returns the results, with the rows and columns switched</summary>
         {
             double[,] temp = new double[arr.GetLength(1), arr.GetLength(0)];
             for (int i = 0; i < arr.GetLength(0); i++)
@@ -223,7 +208,7 @@ namespace ElasticNetRegression
             {
                 for (int j = 0; j < array1.GetLength(1); j++)
                 {
-                    array1[i, j] = array1[i, j] - array2[i, j];
+                    temp[i, j] = array1[i, j] - array2[i, j];
                 }
             }
             return array1;
@@ -241,81 +226,105 @@ namespace ElasticNetRegression
             return total;
         }
 
+        //Helper function used for testing, prints 1d array
+        void print1d(double[] array)
+        {
+
+            for (int j = 0; j < array.GetLength(0); j++)
+            {
+                Console.Write("{0} ", array[j]);
+            }
+
+        }
+        //Helper function used for testing, prints 2d array
+        void print2d(double[,] array)
+        {
+            Console.Write("[");
+            for (int i = 0; i < array.GetLength(0); i++)
+            {
+                Console.Write("[");
+                for (int j = 0; j < array.GetLength(1); j++)
+                {
+                    Console.Write("{0}, ", array[i, j]);
+                }
+                Console.Write("]");
+                Console.Write(", ");
+            }
+            Console.WriteLine("]");
+        }
+
         static void Main(string[] args)
         {
             //learning_rate, iterations, l1_penality, l2_penality 
-            ElasticRegression e1 = new ElasticRegression(0.01, 100, .5, .5);
-            ElasticRegression e2 = new ElasticRegression(0.01, 100, .5, .5);
+            ElasticRegression e1 = new ElasticRegression(0.01, 10000, .005, .005);
+            ElasticRegression e2 = new ElasticRegression(0.01, 100, .005, .005);
      
             Random q = new Random();
+            //Creates input data
             double[,] Xactual = new double[10000, 1];
             for (int i = 0; i < Xactual.GetLength(0); i++)
             {
-                Xactual[i, 0] = (q.NextDouble() * 100) + 2;
-                //Xactual[i, 1] = (q.NextDouble() * 10) + 2;
+                Xactual[i, 0] = (q.NextDouble() * 10) + 2;
+               
             }
-            Console.WriteLine("XBuilt");
+
+            //Creates output data
             double[,] Yactual = new double[10000, 1];
             for (int i = 0; i < Xactual.GetLength(0); i++)
             {
-                Yactual[i, 0] = ((Xactual[i, 0])* (Xactual[i, 0]) * 100 + 20000);
+                Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
             }
-            //e.print2d();
             
             
-            Console.WriteLine("FinshedBuilding");
+           
+            Console.WriteLine("Finshed Building Data");
             
             
-            Console.WriteLine("Final Prediction:");
-            //e.print2d(e.predict(Xactual));
+        
             var context = Context.CreateDefault();
             Stopwatch stopwatch = new Stopwatch();
 
             Accelerator accelerator = context.CreateCPUAccelerator(0);
+            
+            //First tests at using accelerator, no improvement on runtime.
+            //stopwatch.Start();
+            //using (accelerator)
+            //{
+            //    Console.WriteLine("Before fit");
+            //    e1.fit(Xactual, Yactual);
+            //}
+            //accelerator.Dispose();
+            //stopwatch.Stop();
+            //Console.WriteLine("With accelerator");
+            //Console.WriteLine(stopwatch.Elapsed);
 
-            stopwatch.Start();
-            using (accelerator)
-            {
-                Console.WriteLine("Before fit");
-                e1.fit(Xactual, Yactual);
-            }
-            accelerator.Dispose();
-            stopwatch.Stop();
-            Console.WriteLine("With accelerator");
-            Console.WriteLine(stopwatch.Elapsed);
 
+             
             Stopwatch stopwatch2 = new Stopwatch();
 
-            
+
             stopwatch2.Start();
-           
+
             Console.WriteLine("Before fit");
             e2.fit(Xactual, Yactual);
-            
+
             stopwatch2.Stop();
-            Console.WriteLine("Withpout accelerator");
+            Console.WriteLine("Without accelerator");
             Console.WriteLine(stopwatch2.Elapsed);
 
 
-            foreach (CPUDevice qqq in context.GetCPUDevices())
-            {
-                using CPUAccelerator accelerator2 = (CPUAccelerator)qqq.CreateAccelerator(context);
-                Console.WriteLine(accelerator2);
-                //Console.WriteLine(GetInfoString(accelerator2));
-            }
-            double[,] res = e1.predict(Xactual);
-            //Console.WriteLine("Prediction:");
-            //e.print2d(res);
-            //Console.WriteLine("");
-            //Console.WriteLine("Actual:");
-            //e.print2d(Yactual);
-            for (int i = 0; i < res.GetLength(0); i++)
-            {
-                Console.Write(res[i, 0]);
-                Console.Write(", ");
-                Console.Write(Yactual[i, 0]);
-                Console.WriteLine();
-            }
+
+            double[,] res = e2.predict(Xactual);
+
+
+            //This prints out the prediction with the actual
+            //for (int i = 0; i < res.GetLength(0); i++)
+            //{
+            //    Console.Write(res[i, 0]);
+            //    Console.Write(", ");
+            //    Console.Write(Yactual[i, 0]);
+            //    Console.WriteLine();
+            //}
 
             Console.WriteLine("Done");
 
