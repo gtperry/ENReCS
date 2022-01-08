@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "GXvFU9bEyGDYDbybPq5vUE7UcXz47aVQG1INoa90vkd9n5mg6adlmmfISRnVv74zjFmsg62T+ln/qvvv+XU0sQ==",
+  "dgSpecHash": "J+B2pwUqWfAdRtWEYX7ZSTBNRpp4l/Bbmdu87AVf3xb/CZKUBgPeIkdXU/0FrR34SgUnX2mQf6kw9/s7GNOQTw==",
   "success": true,
-  "projectFilePath": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression/ElasticNetRegression.csproj",
+  "projectFilePath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj",
   "expectedPackageFiles": [
     "/Users/griffinperry/.nuget/packages/ilgpu/1.0.0/ilgpu.1.0.0.nupkg.sha512",
     "/Users/griffinperry/.nuget/packages/system.collections.immutable/5.0.0/system.collections.immutable.5.0.0.nupkg.sha512",

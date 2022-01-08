@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression/ElasticNetRegression.csproj": {}
+    "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj": {}
   },
   "projects": {
-    "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression/ElasticNetRegression.csproj": {
+    "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression/ElasticNetRegression.csproj",
+        "projectUniqueName": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj",
         "projectName": "ElasticNetRegression",
-        "projectPath": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression/ElasticNetRegression.csproj",
+        "projectPath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj",
         "packagesPath": "/Users/griffinperry/.nuget/packages/",
-        "outputPath": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression/obj/",
+        "outputPath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/Users/griffinperry/.config/NuGet/NuGet.Config"
+          "/Users/griffinperry/.nuget/NuGet/NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net5.0"

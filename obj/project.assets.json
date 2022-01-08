@@ -193,11 +193,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression.csproj",
+      "projectUniqueName": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj",
       "projectName": "ElasticNetRegression",
-      "projectPath": "/Users/griffinperry/Projects/ElasticNetRegression/ElasticNetRegression.csproj",
+      "projectPath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj",
       "packagesPath": "/Users/griffinperry/.nuget/packages/",
-      "outputPath": "/Users/griffinperry/Projects/ElasticNetRegression/obj/",
+      "outputPath": "/Users/griffinperry/Projects/ENReCS/obj/",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "/Users/griffinperry/.nuget/NuGet/NuGet.Config"
