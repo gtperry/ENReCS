@@ -1,7 +1,7 @@
 # ENReCS
 Elastic Net Regression algorithm written in C sharp (beta)
 
-##About
+## About
 A Perceiver AI project (https://perceiver.ai/#) built by Griffin Perry
 
 # Dependencies
