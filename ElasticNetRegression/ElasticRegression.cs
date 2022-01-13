@@ -203,7 +203,7 @@ namespace ElasticNetRegression
             ///<summary>Subtracts the values of arr2 from the corresponding ones in array1. Arrays must be same dimensions</summary>
             
         {
-            //double[,] temp = new double[array1.GetLength(0), array1.GetLength(1)];
+            double[,] temp = new double[array1.GetLength(0), array1.GetLength(1)];
             for (int i = 0; i < array1.GetLength(0); i++)
             {
                 for (int j = 0; j < array1.GetLength(1); j++)
@@ -256,7 +256,7 @@ namespace ElasticNetRegression
         static void Main(string[] args)
         {
             //learning_rate, iterations, l1_penality, l2_penality 
-            ElasticRegression e1 = new ElasticRegression(0.01, 10000, .005, .005);
+            ElasticRegression e1 = new ElasticRegression(0.01, 100, .005, .005);
             ElasticRegression e2 = new ElasticRegression(0.01, 100, .005, .005);
      
             Random q = new Random();
