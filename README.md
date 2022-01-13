@@ -1,5 +1,5 @@
 # ENReCS
-Elastic Net Regression algorithm written in C sharp (beta)
+Elastic Net Regression algorithm written in C sharp (alpha stage)
 
 ## About
 A [Perceiver AI](https://perceiver.ai/#) project  built by Griffin Perry
