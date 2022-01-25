@@ -15,6 +15,7 @@ namespace ElasticNetRegression
         int Iterations;
         int M;
         int N;
+        int Q;
 
         double Learning_rate;
         double L1_penality;
@@ -57,12 +58,15 @@ namespace ElasticNetRegression
 
             
             //Number of training examples
-            this.M = X.GetLength(0);
+            this.M = X.GetLength(0)*Y.GetLength(1);
             //Number of features
             this.N = X.GetLength(1);
 
+            //Number of outputs
+            this.Q = Y.GetLength(1);
+ 
             //Initializes variables
-            this.W = new double[this.N, 1];
+            this.W = new double[this.N, this.Q];
             this.B = 0.0;
             this.X = X;
             this.Y = Y;
@@ -87,23 +91,34 @@ namespace ElasticNetRegression
         {
             //Generate a prediction based on inputs
             double[,] Y_pred = this.predict(this.X);
+            Console.WriteLine("Y PRED HERE ");
+            print2d(Y_pred);
+            Console.WriteLine("");
+            Console.WriteLine("");
+            Console.WriteLine("");
+            Console.WriteLine("-----------------");
            
             //calculate gradients  
-            double[,] dW = new double[this.N, 1];
+            double[,] dW = new double[this.N, this.Q];
             for(int j = 0; j < this.N; j++)
             {
-                if (this.W[j, 0] > 0)
-                {
-                    dW[j, 0] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[0, j] * 2.0) + this.L1_penality) + (2 * this.L2_penality * this.W[j, 0])) / this.M; ;
+                for(int z = 0; z < this.Q; z++){
+                    if (this.W[j, z] > 0)
+                    {
+                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0 + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                    }
+                    else
+                    {
+                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0 - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                    }
                 }
-                else
-                {
-                    dW[j, 0] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[0, j] * 2.0) - this.L1_penality) + (2 * this.L2_penality * this.W[j, 0])) / this.M; ;
-                }
+                
             }
+            //Console.WriteLine("DW");
+            //print2d(dW);
             double db = (-(2.0 * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
             this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
-            this.B = this.B - this.Learning_rate * db;
+            this.B = this.B - (this.Learning_rate * db);
             return this;
         }
 
@@ -118,6 +133,18 @@ namespace ElasticNetRegression
 
             //Initialize all varaibles
             int m = x.GetLength(0), n = x.GetLength(1), p = y.GetLength(0), q = y.GetLength(1), i, j;
+            // Console.WriteLine("X");
+            // print2d(x);
+            // Console.WriteLine("");
+            // Console.WriteLine("Y");
+            // print2d(y);
+            // Console.WriteLine("");
+            // Console.WriteLine("-------------");
+            // Console.WriteLine("M, N, P, Q");
+            // Console.WriteLine(m);
+            // Console.WriteLine(n);
+            // Console.WriteLine(p);
+            // Console.WriteLine(q);
 
             //Create empty array of new size
             double[,] c = new double[m, q];
@@ -149,6 +176,9 @@ namespace ElasticNetRegression
             ///<summary>Predicts output based off of x</summary>
             ///<param name="x">Array of inputs</param>
         { 
+            // Console.WriteLine("This.w and x");
+            // print2d(this.W);
+            // print2d(x);
             return applyadd(matrixmul(x, this.W), this.B);
         }
 
@@ -187,6 +217,21 @@ namespace ElasticNetRegression
         double[,] subtwoarrs(double[,] arr, double[,] val)
             ///<summary>subtracts the values of an array from another one, and returns the results, with the rows and columns switched</summary>
         {
+            // Console.WriteLine("---------------");
+            // Console.WriteLine("INSIDE SUBTWOARRS");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("ARR");
+            // print2d(arr);
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("val");
+            // print2d(val);
+            
+
+
             double[,] temp = new double[arr.GetLength(1), arr.GetLength(0)];
             for (int i = 0; i < arr.GetLength(0); i++)
             {
@@ -195,6 +240,12 @@ namespace ElasticNetRegression
                     temp[j, i] = arr[i, j] - val[i, j];
                 }
             }
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("val");
+            // print2d(temp);
+            // Console.WriteLine("---------------");
             return temp;
 
         }
@@ -211,7 +262,7 @@ namespace ElasticNetRegression
                     temp[i, j] = array1[i, j] - array2[i, j];
                 }
             }
-            return array1;
+            return temp;
         }
 
         //HelperFunction that gets the sum of Y_pred or this.Y
@@ -256,23 +307,26 @@ namespace ElasticNetRegression
         static void Main(string[] args)
         {
             //learning_rate, iterations, l1_penality, l2_penality 
-            ElasticRegression e1 = new ElasticRegression(0.01, 100, .005, .005);
-            ElasticRegression e2 = new ElasticRegression(0.01, 100, .005, .005);
+            ElasticRegression e1 = new ElasticRegression(0.005, 1000, .005, .005);
+            ElasticRegression e2 = new ElasticRegression(0.005, 1000, .005, .005);
      
             Random q = new Random();
             //Creates input data
-            double[,] Xactual = new double[10000, 1];
+            double[,] Xactual = new double[10, 1];
             for (int i = 0; i < Xactual.GetLength(0); i++)
             {
                 Xactual[i, 0] = (q.NextDouble() * 10) + 2;
+                //Xactual[i, 1] = (q.NextDouble() * 10) + 2;
                
             }
 
             //Creates output data
-            double[,] Yactual = new double[10000, 1];
+            double[,] Yactual = new double[10, 2];
             for (int i = 0; i < Xactual.GetLength(0); i++)
             {
                 Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
+                Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
+                //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
             }
             
             
@@ -318,13 +372,18 @@ namespace ElasticNetRegression
 
 
             //This prints out the prediction with the actual
-            //for (int i = 0; i < res.GetLength(0); i++)
-            //{
-            //    Console.Write(res[i, 0]);
-            //    Console.Write(", ");
-            //    Console.Write(Yactual[i, 0]);
-            //    Console.WriteLine();
-            //}
+            for (int i = 0; i < res.GetLength(0); i++)
+            {
+               Console.Write(res[i, 0]);
+               Console.Write(" ");
+               Console.Write(res[i, 1]);
+               Console.Write(" | ");
+               Console.Write(Yactual[i, 0]);
+               Console.Write(" ");
+               Console.Write(Yactual[i, 1]);
+
+               Console.WriteLine();
+            }
 
             Console.WriteLine("Done");
 
