@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj": {}
+    "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression.csproj": {}
   },
   "projects": {
-    "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj": {
+    "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj",
+        "projectUniqueName": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression.csproj",
         "projectName": "ElasticNetRegression",
-        "projectPath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj",
-        "packagesPath": "/Users/griffinperry/.nuget/packages/",
-        "outputPath": "/Users/griffinperry/Projects/ENReCS/obj/",
+        "projectPath": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression.csproj",
+        "packagesPath": "C:\\Users\\griff\\.nuget\\packages\\",
+        "outputPath": "C:\\Users\\griff\\WorkPAI\\ENReCS\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "/Users/griffinperry/.nuget/NuGet/NuGet.Config"
+          "C:\\Users\\griff\\AppData\\Roaming\\NuGet\\NuGet.Config"
         ],
         "originalTargetFrameworks": [
           "net6.0"
@@ -40,7 +40,7 @@
           "dependencies": {
             "ILGPU": {
               "target": "Package",
-              "version": "[1.0.0, )"
+              "version": "[1.1.0, )"
             }
           },
           "imports": [
@@ -58,7 +58,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/6.0.100/RuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.101\\RuntimeIdentifierGraph.json"
         }
       }
     }

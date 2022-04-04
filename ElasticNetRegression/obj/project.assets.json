@@ -188,19 +188,19 @@
     ]
   },
   "packageFolders": {
-    "/Users/griffinperry/.nuget/packages/": {}
+    "C:\\Users\\griff\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj",
+      "projectUniqueName": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression\\ElasticNetRegression.csproj",
       "projectName": "ElasticNetRegression",
-      "projectPath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj",
-      "packagesPath": "/Users/griffinperry/.nuget/packages/",
-      "outputPath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/obj/",
+      "projectPath": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression\\ElasticNetRegression.csproj",
+      "packagesPath": "C:\\Users\\griff\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/griffinperry/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\griff\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net5.0"
@@ -241,8 +241,20 @@
         "warn": true,
         "downloadDependencies": [
           {
-            "name": "Microsoft.NETCore.App.Host.osx-x64",
-            "version": "[5.0.12, 5.0.12]"
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[5.0.0, 5.0.0]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[5.0.13, 5.0.13]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[5.0.0, 5.0.0]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Ref",
+            "version": "[5.0.0, 5.0.0]"
           }
         ],
         "frameworkReferences": {
@@ -250,7 +262,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/6.0.100/RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.101\\RuntimeIdentifierGraph.json"
       }
     }
   }

@@ -91,12 +91,12 @@ namespace ElasticNetRegression
         {
             //Generate a prediction based on inputs
             double[,] Y_pred = this.predict(this.X);
-            Console.WriteLine("Y PRED HERE ");
-            print2d(Y_pred);
-            Console.WriteLine("");
-            Console.WriteLine("");
-            Console.WriteLine("");
-            Console.WriteLine("-----------------");
+            // Console.WriteLine("Y PRED HERE ");
+            // print2d(Y_pred);
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("-----------------");
            
             //calculate gradients  
             double[,] dW = new double[this.N, this.Q];
@@ -268,88 +268,111 @@ namespace ElasticNetRegression
 
         static void Main(string[] args)
         {
-            //learning_rate, iterations, l1_penality, l2_penality 
-            ElasticRegression e1 = new ElasticRegression(0.005, 1000, .005, .005);
-            ElasticRegression e2 = new ElasticRegression(0.005, 1000, .005, .005);
+            // //learning_rate, iterations, l1_penality, l2_penality 
+            // ElasticRegression e1 = new ElasticRegression(0.005, 1000, .005, .005);
+            // ElasticRegression e2 = new ElasticRegression(0.005, 1000, .005, .005);
      
-            Random q = new Random();
-            //Creates input data
-            double[,] Xactual = new double[10, 2];
-            for (int i = 0; i < Xactual.GetLength(0); i++)
-            {
-                Xactual[i, 0] = (q.NextDouble() * 10) + 2;
-                Xactual[i, 1] = (q.NextDouble() * 10) + 2;
+            // Random q = new Random();
+            // //Creates input data
+            // double[,] Xactual = new double[10, 2];
+            // for (int i = 0; i < Xactual.GetLength(0); i++)
+            // {
+            //     Xactual[i, 0] = (q.NextDouble() * 10) + 2;
+            //     Xactual[i, 1] = (q.NextDouble() * 10) + 2;
                
-            }
+            // }
 
-            //Creates output data
-            double[,] Yactual = new double[10, 2];
-            for (int i = 0; i < Xactual.GetLength(0); i++)
-            {
-                Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
-                Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
-                //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
-            }
+            // //Creates output data
+            // double[,] Yactual = new double[10, 2];
+            // for (int i = 0; i < Xactual.GetLength(0); i++)
+            // {
+            //     Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
+            //     Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
+            //     //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
+            // }
             
             
            
-            Console.WriteLine("Finshed Building Data");
+            // Console.WriteLine("Finshed Building Data");
             
             
         
-            var context = Context.CreateDefault();
-            Stopwatch stopwatch = new Stopwatch();
+            // // var context = Context.CreateDefault();
+            // // Stopwatch stopwatch = new Stopwatch();
 
-            Accelerator accelerator = context.CreateCPUAccelerator(0);
+            // // Accelerator accelerator = context.CreateCPUAccelerator(0);
             
-            //First tests at using accelerator, no improvement on runtime.
-            //stopwatch.Start();
-            //using (accelerator)
-            //{
-            //    Console.WriteLine("Before fit");
-            //    e1.fit(Xactual, Yactual);
-            //}
-            //accelerator.Dispose();
-            //stopwatch.Stop();
-            //Console.WriteLine("With accelerator");
-            //Console.WriteLine(stopwatch.Elapsed);
+            // //First tests at using accelerator, no improvement on runtime.
+            // //stopwatch.Start();
+            // //using (accelerator)
+            // //{
+            // //    Console.WriteLine("Before fit");
+            // //    e1.fit(Xactual, Yactual);
+            // //}
+            // //accelerator.Dispose();
+            // //stopwatch.Stop();
+            // //Console.WriteLine("With accelerator");
+            // //Console.WriteLine(stopwatch.Elapsed);
 
 
              
-            Stopwatch stopwatch2 = new Stopwatch();
+            // // Stopwatch stopwatch2 = new Stopwatch();
 
 
-            stopwatch2.Start();
+            // // stopwatch2.Start();
 
-            Console.WriteLine("Before fit");
-            e2.fit(Xactual, Yactual);
+            // Console.WriteLine("Before fit");
+            // e2.fit(Xactual, Yactual);
 
-            stopwatch2.Stop();
-            Console.WriteLine("Without accelerator");
-            Console.WriteLine(stopwatch2.Elapsed);
-
-
-
-            double[,] res = e2.predict(Xactual);
+            // // stopwatch2.Stop();
+            // Console.WriteLine("Without accelerator");
+            // //Console.WriteLine(stopwatch2.Elapsed);
 
 
-            //This prints out the prediction with the actual
-            for (int i = 0; i < res.GetLength(0); i++)
+
+            // double[,] res = e2.predict(Xactual);
+
+
+            // //This prints out the prediction with the actual
+            // for (int i = 0; i < res.GetLength(0); i++)
+            // {
+            //    Console.Write(res[i, 0]);
+            //    Console.Write(" ");
+            //    Console.Write(res[i, 1]);
+            //    Console.Write(" | ");
+            //    Console.Write(Yactual[i, 0]);
+            //    Console.Write(" ");
+            //    Console.Write(Yactual[i, 1]);
+
+            //    Console.WriteLine();
+            // }
+
+            // Console.WriteLine("Done");
+        
+   
+            // Context context = Context.Create(builder => builder.AllAccelerators());
+
+            // foreach (Device device in context)
+            // {
+            //     Console.WriteLine(device);
+            // }
+            using Context context = Context.Create(builder => builder.AllAccelerators());
+            Console.WriteLine("Context: " + context.ToString());
+
+            Device d = context.GetPreferredDevice(preferCPU: false);
+            Accelerator a = d.CreateAccelerator(context);
+
+            a.PrintInformation();
+            a.Dispose();
+
+            foreach(Device device in context.GetPreferredDevices(preferCPU: false, matchingDevicesOnly: false))
             {
-               Console.Write(res[i, 0]);
-               Console.Write(" ");
-               Console.Write(res[i, 1]);
-               Console.Write(" | ");
-               Console.Write(Yactual[i, 0]);
-               Console.Write(" ");
-               Console.Write(Yactual[i, 1]);
-
-               Console.WriteLine();
+                Accelerator accelerator = device.CreateAccelerator(context);
+                accelerator.PrintInformation();
+                accelerator.Dispose();
             }
-
-            Console.WriteLine("Done");
-
         }
-    }
 
+        
+    }
 }

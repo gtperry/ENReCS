@@ -1,15 +1,18 @@
 {
   "version": 2,
-  "dgSpecHash": "J+B2pwUqWfAdRtWEYX7ZSTBNRpp4l/Bbmdu87AVf3xb/CZKUBgPeIkdXU/0FrR34SgUnX2mQf6kw9/s7GNOQTw==",
+  "dgSpecHash": "ThBHs2kVLA8EutY1gAix1pJlqAeldAmtoLLrEvkuS8Bq1HvBFagm3gc9r2sRxJdXdQonDw6eNLl07+P3ol71kA==",
   "success": true,
-  "projectFilePath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression/ElasticNetRegression.csproj",
+  "projectFilePath": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression\\ElasticNetRegression.csproj",
   "expectedPackageFiles": [
-    "/Users/griffinperry/.nuget/packages/ilgpu/1.0.0/ilgpu.1.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.collections.immutable/5.0.0/system.collections.immutable.5.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.memory/4.5.4/system.memory.4.5.4.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.reflection.metadata/5.0.0/system.reflection.metadata.5.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.runtime.compilerservices.unsafe/5.0.0/system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/microsoft.netcore.app.host.osx-x64/5.0.12/microsoft.netcore.app.host.osx-x64.5.0.12.nupkg.sha512"
+    "C:\\Users\\griff\\.nuget\\packages\\ilgpu\\1.0.0\\ilgpu.1.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.collections.immutable\\5.0.0\\system.collections.immutable.5.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.memory\\4.5.4\\system.memory.4.5.4.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.reflection.metadata\\5.0.0\\system.reflection.metadata.5.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\5.0.0\\system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\microsoft.netcore.app.ref\\5.0.0\\microsoft.netcore.app.ref.5.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\5.0.0\\microsoft.windowsdesktop.app.ref.5.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\5.0.0\\microsoft.aspnetcore.app.ref.5.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\5.0.13\\microsoft.netcore.app.host.win-x64.5.0.13.nupkg.sha512"
   ],
   "logs": []
 }

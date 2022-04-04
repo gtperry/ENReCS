@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "dgSpecHash": "NS7XMCN4TynQdnNkMzxCJTWq2Rwq/jdJJzVnsMgRQ6kMNUp+EhIVLhMu334kC1KGoKh/LoyXp0NxATSF0tVPxw==",
+  "dgSpecHash": "900M4n3LM3Cj6q+JEe7doZk0nVsZOUo+BX536HsH0BJKbKzkts00VmDdlspupuL/M/fIKy2o5yA0zPkdHZaUEQ==",
   "success": true,
-  "projectFilePath": "/Users/griffinperry/Projects/ENReCS/ElasticNetRegression.csproj",
+  "projectFilePath": "C:\\Users\\griff\\WorkPAI\\ENReCS\\ElasticNetRegression.csproj",
   "expectedPackageFiles": [
-    "/Users/griffinperry/.nuget/packages/ilgpu/1.0.0/ilgpu.1.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.collections.immutable/5.0.0/system.collections.immutable.5.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.memory/4.5.4/system.memory.4.5.4.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.reflection.metadata/5.0.0/system.reflection.metadata.5.0.0.nupkg.sha512",
-    "/Users/griffinperry/.nuget/packages/system.runtime.compilerservices.unsafe/5.0.0/system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512"
+    "C:\\Users\\griff\\.nuget\\packages\\ilgpu\\1.1.0\\ilgpu.1.1.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.collections.immutable\\6.0.0\\system.collections.immutable.6.0.0.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.memory\\4.5.4\\system.memory.4.5.4.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.reflection.metadata\\6.0.1\\system.reflection.metadata.6.0.1.nupkg.sha512",
+    "C:\\Users\\griff\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
   ],
   "logs": []
 }
