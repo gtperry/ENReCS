@@ -17,27 +17,33 @@ namespace ElasticNetRegression
         int N;
         int Q;
 
-        double Learning_rate;
-        double L1_penality;
-        double L2_penality;
-        double B;
+        float Learning_rate;
+        float L1_penality;
+        float L2_penality;
+        float B;
         
-        double[,] X;
-        double[,] Y;
-        double[,] W;
+        float[,] X;
+        float[,] Y;
+        float[,] W;
 
+        Device dev;
+        Accelerator accelerate;
+       
         //Will be used later when optimized for GPU use
-        //Context context;
+        Context context;
 
 
         //Constructor
-        public ElasticRegression(double learning_rate, int iterations, double l1_penality, double l2_penality)
+        public ElasticRegression(float learning_rate, int iterations, float l1_penality, float l2_penality)
         {
             ///<summary>Constructor for ElasticRegression object</summary>
-            ///<param name="learning_rate">(double) learning rate of the regression</param>
+            ///<param name="learning_rate">(float) learning rate of the regression</param>
             ///<param name="iterations">(int) How many iterations of the algorithm will run when the model is fit</param>
-            ///<param name="l1_penality">(double )L1 penality</param>
-            ///<param name="l2_penality">(double )L2 penality</param>
+            ///<param name="l1_penality">(float )L1 penality</param>
+            ///<param name="l2_penality">(float )L2 penality</param>
+
+
+            this.context = Context.Create(builder => builder.AllAccelerators());
 
             this.Learning_rate = learning_rate;
 
@@ -46,14 +52,21 @@ namespace ElasticNetRegression
             this.L1_penality = l1_penality;
 
             this.L2_penality = l2_penality;
+
+            this.dev = this.context.GetPreferredDevice(preferCPU: false);
+            Console.WriteLine(this.dev);
+
+           
+
+
         }
 
         //Function for model training
-        public ElasticRegression fit(double[,] X, double[,] Y, bool verbose = true)
+        public ElasticRegression fit(float[,] X, float[,] Y, bool verbose = true)
         {
             ///<summary>Trains the model</summary>
-            ///<param name="X">(double[,]) A 2d array of the inputs to be trained on.</param>
-            ///<param name="Y">(double[,]) A 2d array of the target outputs, must have same length as X</param>
+            ///<param name="X">(float[,]) A 2d array of the inputs to be trained on.</param>
+            ///<param name="Y">(float[,]) A 2d array of the target outputs, must have same length as X</param>
             ///<param name="verbose">(boolean) Determines if the program outputs updates as it runs, default = true</param>
 
             
@@ -66,8 +79,8 @@ namespace ElasticNetRegression
             this.Q = Y.GetLength(1);
  
             //Initializes variables
-            this.W = new double[this.N, this.Q];
-            this.B = 0.0;
+            this.W = new float[this.N, this.Q];
+            this.B = 0.0f;
             this.X = X;
             this.Y = Y;
 
@@ -85,12 +98,48 @@ namespace ElasticNetRegression
 
             return this;
         }
+        public ElasticRegression fitNOGPU(float[,] X, float[,] Y, bool verbose = true)
+        {
+            ///<summary>Trains the model</summary>
+            ///<param name="X">(float[,]) A 2d array of the inputs to be trained on.</param>
+            ///<param name="Y">(float[,]) A 2d array of the target outputs, must have same length as X</param>
+            ///<param name="verbose">(boolean) Determines if the program outputs updates as it runs, default = true</param>
+
+            
+            //Number of training examples
+            this.M = X.GetLength(0)*Y.GetLength(1);
+            //Number of features
+            this.N = X.GetLength(1);
+
+            //Number of outputs
+            this.Q = Y.GetLength(1);
+ 
+            //Initializes variables
+            this.W = new float[this.N, this.Q];
+            this.B = 0.0f;
+            this.X = X;
+            this.Y = Y;
+
+            //Gradient descent learning
+            for(int i = 0; i < this.Iterations; i++)
+            {
+                if (verbose)
+                {
+                    Console.WriteLine("Iteration {0}/{1}", i, this.Iterations);
+                }
+
+                //Updates the weights after each iteration
+                this.update_weightsNOGPU();
+            }
+
+            return this;
+        }
 
         //Helper function to update weights in gradient descent
         public ElasticRegression update_weights()
         {
             //Generate a prediction based on inputs
-            double[,] Y_pred = this.predict(this.X);
+            float[,] Y_pred = this.predict(this.X);
             // Console.WriteLine("Y PRED HERE ");
             // print2d(Y_pred);
             // Console.WriteLine("");
@@ -98,32 +147,74 @@ namespace ElasticNetRegression
             // Console.WriteLine("");
             // Console.WriteLine("-----------------");
            
+            this.accelerate = this.dev.CreateAccelerator(this.context);
+
             //calculate gradients  
-            double[,] dW = new double[this.N, this.Q];
+            float[,] dW = new float[this.N, this.Q];
             for(int j = 0; j < this.N; j++)
             {
                 for(int z = 0; z < this.Q; z++){
                     if (this.W[j, z] > 0)
                     {
-                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0 + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                        dW[j, z] = (((-(MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
                     }
                     else
                     {
-                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0 - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                        dW[j, z] = (((-(MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
                     }
                 }
                 
             }
 
-            double db = (-(2.0 * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+            float db = (-(2.0F * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
             this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
             this.B = this.B - (this.Learning_rate * db);
+
+            this.accelerate.Dispose();
+            return this;
+        }
+
+         public ElasticRegression update_weightsNOGPU()
+        {
+            //Generate a prediction based on inputs
+            float[,] Y_pred = this.predictNOGPU(this.X);
+            // Console.WriteLine("Y PRED HERE ");
+            // print2d(Y_pred);
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("-----------------");
+           
+            
+
+            //calculate gradients  
+            float[,] dW = new float[this.N, this.Q];
+            for(int j = 0; j < this.N; j++)
+            {
+                for(int z = 0; z < this.Q; z++){
+                    if (this.W[j, z] > 0)
+                    {
+                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                    }
+                    else
+                    {
+                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                    }
+                }
+                
+            }
+
+            float db = (-(2.0F * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+            this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
+            this.B = this.B - (this.Learning_rate * db);
+
+            
             return this;
         }
 
         
         //Matrix Multiplication (dot product)
-        double[,] matrixmul(double[,] x, double[,] y)
+        float[,] matrixmul(float[,] x, float[,] y)
         {
             ///<summary>Does matrix multiplication on two 2d arrays</summary>
             ///<param name="x">Array 1</param>
@@ -134,7 +225,7 @@ namespace ElasticNetRegression
             int m = x.GetLength(0), n = x.GetLength(1), p = y.GetLength(0), q = y.GetLength(1), i, j;
 
             //Create empty array of new size
-            double[,] c = new double[m, q];
+            float[,] c = new float[m, q];
 
             //Check that the arrays are the correct sizes, and compatible
             if (n != p)
@@ -157,20 +248,80 @@ namespace ElasticNetRegression
             }
             return c;
         }
+
+        static float[,] MatrixMultiplyAccelerated(Accelerator accelerator, float[,] a, float[,] b)
+        {
+            var m = a.GetLength(0);
+            var ka = a.GetLength(1);
+            var kb = b.GetLength(0);
+            var n = b.GetLength(1);
+
+            if (ka != kb)
+                throw new ArgumentException($"Cannot multiply {m}x{ka} matrix by {n}x{kb} matrix", nameof(b));
+
+            var kernel = accelerator.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>>(
+                MatrixMultiplyAcceleratedKernel);
+
+            using var aBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, ka));
+            using var bBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(ka, n));
+            using var cBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, n));
+            aBuffer.CopyFromCPU(a);
+            bBuffer.CopyFromCPU(b);
+
+            kernel(cBuffer.Extent.ToIntIndex(), aBuffer.View, bBuffer.View, cBuffer.View);
+
+            // Reads data from the GPU buffer into a new CPU array.
+            // Implicitly calls accelerator.DefaultStream.Synchronize() to ensure
+            // that the kernel and memory copy are completed first.
+            return cBuffer.GetAsArray2D();
+        }
+
+
+        static void MatrixMultiplyAcceleratedKernel(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            ArrayView2D<float, Stride2D.DenseX> bView,
+            ArrayView2D<float, Stride2D.DenseX> cView)
+        {
+            var x = index.X;
+            var y = index.Y;
+            var sum = 0.0f;
+
+            for (var i = 0; i < aView.IntExtent.Y; i++)
+                sum += aView[new Index2D(x, i)] * bView[new Index2D(i, y)];
+
+            cView[index] = sum;
+        }
+
         //Predicts outputs based off of x
 
-        double[,] predict(double[,] x)
+        float[,] predict(float[,] x)
             ///<summary>Predicts output based off of x</summary>
             ///<param name="x">Array of inputs</param>
         { 
-            return applyadd(matrixmul(x, this.W), this.B);
+            this.accelerate = this.dev.CreateAccelerator(this.context);
+            float[,] prediction = applyadd(MatrixMultiplyAccelerated(this.accelerate, x, this.W), this.B);
+            this.accelerate.Dispose();
+            return prediction;
+        }
+        float[,] predictNOGPU(float[,] x)
+            ///<summary>Predicts output based off of x</summary>
+            ///<param name="x">Array of inputs</param>
+        { 
+            
+           return applyadd(matrixmul(x, this.W), this.B);
+            
         }
 
         //Adds a value to each member of a 2d array
-        double[,] applyadd(double[,] arr, double val)
+        float[,] applyadd(float[,] arr, float val)
             ///<summary>Adds a value to each member of a 2d array</summary>
         {
-            double[,] temp = new double[arr.GetLength(0), arr.GetLength(1)];
+            float[,] temp = new float[arr.GetLength(0), arr.GetLength(1)];
             for (int i = 0; i < arr.GetLength(0); i++)
             {
                 for (int j = 0; j < arr.GetLength(1); j++)
@@ -182,10 +333,10 @@ namespace ElasticNetRegression
 
         }
         //Multiplies each member of a 2d array by a value
-        double[,] applymul(double[,] arr, double val)
+        float[,] applymul(float[,] arr, float val)
             ///<summary>Multiplies each member of a 2d array by a value</summary>
         {
-            double[,] temp = new double[arr.GetLength(0), arr.GetLength(1)];
+            float[,] temp = new float[arr.GetLength(0), arr.GetLength(1)];
             for (int i = 0; i < arr.GetLength(0); i++)
             {
                 for (int j = 0; j < arr.GetLength(1); j++)
@@ -197,10 +348,10 @@ namespace ElasticNetRegression
         }
         
         
-        double[,] subtwoarrs(double[,] arr, double[,] val)
+        float[,] subtwoarrs(float[,] arr, float[,] val)
             ///<summary>subtracts the values of an array from another one, and returns the results, with the rows and columns switched</summary>
         {
-            double[,] temp = new double[arr.GetLength(1), arr.GetLength(0)];
+            float[,] temp = new float[arr.GetLength(1), arr.GetLength(0)];
             for (int i = 0; i < arr.GetLength(0); i++)
             {
                 for (int j = 0; j < arr.GetLength(1); j++)
@@ -212,11 +363,11 @@ namespace ElasticNetRegression
 
         }
         
-        double[,] subtwo2darrs(double[,] array1, double[,] array2)
+        float[,] subtwo2darrs(float[,] array1, float[,] array2)
             ///<summary>Subtracts the values of arr2 from the corresponding ones in array1. Arrays must be same dimensions</summary>
             
         {
-            double[,] temp = new double[array1.GetLength(0), array1.GetLength(1)];
+            float[,] temp = new float[array1.GetLength(0), array1.GetLength(1)];
             for (int i = 0; i < array1.GetLength(0); i++)
             {
                 for (int j = 0; j < array1.GetLength(1); j++)
@@ -229,9 +380,9 @@ namespace ElasticNetRegression
 
         //HelperFunction that gets the sum of Y_pred or this.Y
         //***This will need to be changed to accept multiple outputs
-        double ysum(double[,] y)
+        float ysum(float[,] y)
         {
-            double total = 0;
+            float total = 0;
             for (int i = 0; i < y.GetLength(1); i++)
             {
                 total = total + y[0, i];
@@ -240,7 +391,7 @@ namespace ElasticNetRegression
         }
 
         //Helper function used for testing, prints 1d array
-        void print1d(double[] array)
+        void print1d(float[] array)
         {
 
             for (int j = 0; j < array.GetLength(0); j++)
@@ -250,7 +401,7 @@ namespace ElasticNetRegression
 
         }
         //Helper function used for testing, prints 2d array
-        void print2d(double[,] array)
+        void print2d(float[,] array)
         {
             Console.Write("[");
             for (int i = 0; i < array.GetLength(0); i++)
@@ -269,27 +420,32 @@ namespace ElasticNetRegression
         static void Main(string[] args)
         {
             // //learning_rate, iterations, l1_penality, l2_penality 
-            // ElasticRegression e1 = new ElasticRegression(0.005, 1000, .005, .005);
-            // ElasticRegression e2 = new ElasticRegression(0.005, 1000, .005, .005);
+            ElasticRegression e1 = new ElasticRegression(0.005f, 10, .05f, .05f);
+            ElasticRegression e2 = new ElasticRegression(0.005f, 10, .05f, .05f);
      
-            // Random q = new Random();
-            // //Creates input data
-            // double[,] Xactual = new double[10, 2];
-            // for (int i = 0; i < Xactual.GetLength(0); i++)
-            // {
-            //     Xactual[i, 0] = (q.NextDouble() * 10) + 2;
-            //     Xactual[i, 1] = (q.NextDouble() * 10) + 2;
+            Random q = new Random();
+            //Creates input data
+            float[,] Xactual = new float[10000, 50];
+            for (int i = 0; i < Xactual.GetLength(0); i++)
+            {
+                for(int j=0; j < Xactual.GetLength(1); j++){
+                    Xactual[i, j] = ((float)q.NextDouble() * 10) + 2;
+                }
+                //Xactual[i, 1] = ((float)q.NextDouble() * 10) + 2;
                
-            // }
+            }
 
-            // //Creates output data
-            // double[,] Yactual = new double[10, 2];
-            // for (int i = 0; i < Xactual.GetLength(0); i++)
-            // {
-            //     Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
-            //     Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
-            //     //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
-            // }
+            //Creates output data
+            float[,] Yactual = new float[10000, 50];
+            for (int i = 0; i < Xactual.GetLength(0); i++)
+            {
+                for(int j = 0; i < Xactual.GetLength(1); i++){
+                    Yactual[i, j] = ((Xactual[i, j]) * 100 + 2000);
+                }
+                // Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
+                // Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
+                //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
+            }
             
             
            
@@ -322,18 +478,33 @@ namespace ElasticNetRegression
             // // stopwatch2.Start();
 
             // Console.WriteLine("Before fit");
-            // e2.fit(Xactual, Yactual);
+            Stopwatch stopw1 = new Stopwatch();
+            stopw1.Start();
+            e1.fit(Xactual, Yactual);
+            stopw1.Stop();
+
+            Stopwatch stopw2 = new Stopwatch();
+            stopw2.Start();
+            e2.fitNOGPU(Xactual, Yactual);
+            stopw2.Stop();
 
             // // stopwatch2.Stop();
             // Console.WriteLine("Without accelerator");
-            // //Console.WriteLine(stopwatch2.Elapsed);
+            // //
 
 
+            Stopwatch stopw = new Stopwatch();
+            stopw.Start();
+            float[,] res = e1.predict(Xactual);
+            stopw.Stop();
 
-            // double[,] res = e2.predict(Xactual);
+            Stopwatch stopw3 = new Stopwatch();
+            stopw3.Start();
+            float[,] res2 = e2.predictNOGPU(Xactual);
+            stopw3.Stop();
 
 
-            // //This prints out the prediction with the actual
+            //This prints out the prediction with the actual
             // for (int i = 0; i < res.GetLength(0); i++)
             // {
             //    Console.Write(res[i, 0]);
@@ -347,6 +518,13 @@ namespace ElasticNetRegression
             //    Console.WriteLine();
             // }
 
+            Console.WriteLine("With GPU:");
+            Console.WriteLine(stopw1.Elapsed);
+            Console.WriteLine(stopw.Elapsed);
+
+            Console.WriteLine("Without GPU:");
+            Console.WriteLine(stopw2.Elapsed);
+            Console.WriteLine(stopw3.Elapsed);
             // Console.WriteLine("Done");
         
    
@@ -356,21 +534,21 @@ namespace ElasticNetRegression
             // {
             //     Console.WriteLine(device);
             // }
-            using Context context = Context.Create(builder => builder.AllAccelerators());
-            Console.WriteLine("Context: " + context.ToString());
+            // using Context context = Context.Create(builder => builder.AllAccelerators());
+            // Console.WriteLine("Context: " + context.ToString());
 
-            Device d = context.GetPreferredDevice(preferCPU: false);
-            Accelerator a = d.CreateAccelerator(context);
+            // Device d = context.GetPreferredDevice(preferCPU: false);
+            // Accelerator a = d.CreateAccelerator(context);
 
-            a.PrintInformation();
-            a.Dispose();
+            // a.PrintInformation();
+            // a.Dispose();
 
-            foreach(Device device in context.GetPreferredDevices(preferCPU: false, matchingDevicesOnly: false))
-            {
-                Accelerator accelerator = device.CreateAccelerator(context);
-                accelerator.PrintInformation();
-                accelerator.Dispose();
-            }
+            // foreach(Device device in context.GetPreferredDevices(preferCPU: false, matchingDevicesOnly: false))
+            // {
+            //     Accelerator accelerator = device.CreateAccelerator(context);
+            //     accelerator.PrintInformation();
+            //     accelerator.Dispose();
+            // }
         }
 
         
