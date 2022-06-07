@@ -16,6 +16,7 @@ namespace ElasticNetRegression
         int M;
         int N;
         int Q;
+        int numfeatures;
 
         float Learning_rate;
         float L1_penality;
@@ -25,6 +26,8 @@ namespace ElasticNetRegression
         float[,] X;
         float[,] Y;
         float[,] W;
+        float[,] multipliedMatrix;
+        
 
         Device dev;
         Accelerator accelerate;
@@ -71,10 +74,11 @@ namespace ElasticNetRegression
 
             
             //Number of training examples
-            this.M = X.GetLength(0)*Y.GetLength(1);
+            this.M = X.GetLength(0)*X.GetLength(1);
             //Number of features
             this.N = X.GetLength(1);
-
+            this.numfeatures = X.GetLength(1);
+            
             //Number of outputs
             this.Q = Y.GetLength(1);
  
@@ -98,6 +102,42 @@ namespace ElasticNetRegression
 
             return this;
         }
+        public ElasticRegression fitTILED(float[,] X, float[,] Y, bool verbose = true)
+        {
+            ///<summary>Trains the model</summary>
+            ///<param name="X">(float[,]) A 2d array of the inputs to be trained on.</param>
+            ///<param name="Y">(float[,]) A 2d array of the target outputs, must have same length as X</param>
+            ///<param name="verbose">(boolean) Determines if the program outputs updates as it runs, default = true</param>
+
+            
+            //Number of training examples
+            this.M = X.GetLength(0)*X.GetLength(1);
+            //Number of features
+            this.N = X.GetLength(1);
+            this.numfeatures = X.GetLength(1);
+            //Number of outputs
+            this.Q = Y.GetLength(1);
+ 
+            //Initializes variables
+            this.W = new float[this.N, this.Q];
+            this.B = 0.0f;
+            this.X = X;
+            this.Y = Y;
+
+            //Gradient descent learning
+            for(int i = 0; i < this.Iterations; i++)
+            {
+                if (verbose)
+                {
+                    Console.WriteLine("Iteration {0}/{1}", i, this.Iterations);
+                }
+
+                //Updates the weights after each iteration
+                this.update_weightsTILED();
+            }
+
+            return this;
+        }
         public ElasticRegression fitNOGPU(float[,] X, float[,] Y, bool verbose = true)
         {
             ///<summary>Trains the model</summary>
@@ -107,10 +147,10 @@ namespace ElasticNetRegression
 
             
             //Number of training examples
-            this.M = X.GetLength(0)*Y.GetLength(1);
+            this.M = X.GetLength(0)*X.GetLength(1);
             //Number of features
             this.N = X.GetLength(1);
-
+            this.numfeatures = X.GetLength(1);
             //Number of outputs
             this.Q = Y.GetLength(1);
  
@@ -150,17 +190,160 @@ namespace ElasticNetRegression
             this.accelerate = this.dev.CreateAccelerator(this.context);
 
             //calculate gradients  
+            //Console.WriteLine("X");
+            //this.print2d(this.X);
+            //Console.WriteLine("subtwoarrs");
+            //this.print2d(subtwoarrs(this.Y, Y_pred));
+            // Console.WriteLine("Going step by step to find growth");
+            // Console.WriteLine("Y_pred");
+            // this.print2d(Y_pred);
+            // Console.ReadLine();
+            // Console.WriteLine("Y_Actual");
+            // this.print2d(this.Y);
+            // Console.ReadLine();
+            // Console.WriteLine("YDiff");
+            // this.print2d(subtwoarrs(this.Y, Y_pred));
+            // Console.ReadLine();
+            // Console.WriteLine("X");
+            // this.print2d(this.X);
+            // Console.ReadLine();
+            // Console.WriteLine("Matrix Multiplied");
+            // this.print2d(MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X));
+            // Console.WriteLine("M");
+            // Console.WriteLine(this.M);
+            // Console.ReadLine();
+
+
+
+
+
+
+
+
+
+            //Multiplied matrix has # of Youtputs rows and # of X features columns
+            this.multipliedMatrix = (MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X));
+            //float[,] multipliedMatrix2 = (MatrixMultiplyTiled(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X));
+            // Console.WriteLine("mULT MNATRIX");
+            // this.print2d(this.multipliedMatrix);
+            // Console.WriteLine("W");
+            // this.print2d(this.W);
+            // Console.ReadLine();
+
             float[,] dW = new float[this.N, this.Q];
             for(int j = 0; j < this.N; j++)
             {
                 for(int z = 0; z < this.Q; z++){
                     if (this.W[j, z] > 0)
                     {
-                        dW[j, z] = (((-(MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+
+
+
+
+                        dW[j, z] =  (((-1* this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                        // Console.WriteLine("CompA:");
+                        // Console.WriteLine(this.multipliedMatrix[z,j]);
+                        // Console.WriteLine("Base:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Four1:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (4.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Four2");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (4 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Num Feature1:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (this.numfeatures + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Num Feature2:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (this.numfeatures * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Minus");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) - (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("No Double");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * this.L1_penality)) - (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Div:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j]/this.M * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("MISC");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * this.L1_penality)) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        //Console.ReadLine();
                     }
                     else
                     {
-                        dW[j, z] = (((-(MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                        dW[j, z] =  (((-1 * this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
+                        // Console.WriteLine("CompB:");
+                        // Console.WriteLine(this.multipliedMatrix[z,j]);
+                        // Console.WriteLine("Base:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Four1:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (4.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Four2");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (4 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Num Feature1:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (this.numfeatures + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Num Feature2:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (this.numfeatures * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Minus");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) - (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("No Double");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * this.L1_penality)) - (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("Div:");
+                        // Console.WriteLine((((-this.multipliedMatrix[z, j]/this.M * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+                        // Console.WriteLine("MISC");
+                        // Console.WriteLine( (((-1* this.multipliedMatrix[z, j] * - this.L1_penality)) + (2 * this.L2_penality * this.W[j, z])) / this.M);
+
+                        //Console.ReadLine();
+                    }
+                }
+                
+            }
+
+            float db = (-(ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+
+
+            // Console.WriteLine("DB");
+            // Console.WriteLine(db);
+            // Console.ReadLine();
+            // Console.ReadLine();
+
+            // Console.WriteLine("Test");
+            // this.print2d(this.W);
+            // Console.WriteLine();
+            // this.print2d(dW);
+            // Console.WriteLine("Pre^");
+            this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
+            // this.print2d(this.W);
+            // Console.ReadLine();
+            this.B = this.B - (this.Learning_rate * db);
+
+            this.accelerate.Dispose();
+            return this;
+        }
+
+        public ElasticRegression update_weightsTILED()
+        {
+            //Generate a prediction based on inputs
+            float[,] Y_pred = this.predictTILED(this.X);
+            // Console.WriteLine("Y PRED HERE ");
+            // print2d(Y_pred);
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("");
+            // Console.WriteLine("-----------------");
+           
+            
+
+            //calculate gradients  
+            float[,] dW = new float[this.N, this.Q];
+            this.accelerate = this.dev.CreateAccelerator(this.context);
+
+            //calculate gradients  
+            this.multipliedMatrix = (MatrixMultiplyTiled(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X));
+            for(int j = 0; j < this.N; j++)
+            {
+                for(int z = 0; z < this.Q; z++){
+                    if (this.W[j, z] > 0)
+                    {
+                        dW[j, z] =  (((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                    }
+                    else
+                    {
+                        dW[j, z] =  (((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
                     }
                 }
                 
@@ -174,7 +357,7 @@ namespace ElasticNetRegression
             return this;
         }
 
-         public ElasticRegression update_weightsNOGPU()
+        public ElasticRegression update_weightsNOGPU()
         {
             //Generate a prediction based on inputs
             float[,] Y_pred = this.predictNOGPU(this.X);
@@ -189,28 +372,32 @@ namespace ElasticNetRegression
 
             //calculate gradients  
             float[,] dW = new float[this.N, this.Q];
+            this.multipliedMatrix = (matrixmul(subtwoarrs(this.Y, Y_pred), this.X));
             for(int j = 0; j < this.N; j++)
             {
                 for(int z = 0; z < this.Q; z++){
                     if (this.W[j, z] > 0)
                     {
-                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                        dW[j, z] =  (((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
                     }
                     else
                     {
-                        dW[j, z] = (((-(matrixmul(subtwoarrs(this.Y, Y_pred), this.X))[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                        dW[j, z] =  (((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
                     }
                 }
                 
             }
 
             float db = (-(2.0F * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+
             this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
             this.B = this.B - (this.Learning_rate * db);
 
             
             return this;
         }
+
+
 
         
         //Matrix Multiplication (dot product)
@@ -304,7 +491,23 @@ namespace ElasticNetRegression
             ///<param name="x">Array of inputs</param>
         { 
             this.accelerate = this.dev.CreateAccelerator(this.context);
+
             float[,] prediction = applyadd(MatrixMultiplyAccelerated(this.accelerate, x, this.W), this.B);
+
+            // Console.WriteLine("Prediction");
+            // print2d(prediction);
+            // Console.WriteLine("this.W");
+            // print2d(this.W);
+            // Console.ReadLine();
+            this.accelerate.Dispose();
+            return prediction;
+        }
+        float[,] predictTILED(float[,] x)
+            ///<summary>Predicts output based off of x</summary>
+            ///<param name="x">Array of inputs</param>
+        { 
+            this.accelerate = this.dev.CreateAccelerator(this.context);
+            float[,] prediction = applyadd(MatrixMultiplyTiled(this.accelerate, x, this.W), this.B);
             this.accelerate.Dispose();
             return prediction;
         }
@@ -417,15 +620,211 @@ namespace ElasticNetRegression
             Console.WriteLine("]");
         }
 
+        const int TILE_SIZE = 2;
+        static float[,] MatrixMultiplyTiled(Accelerator accelerator, float[,] a, float[,] b)
+        {
+            var m = a.GetLength(0);
+            var ka = a.GetLength(1);
+            var kb = b.GetLength(0);
+            var n = b.GetLength(1);
+
+            if (ka != kb)
+                throw new ArgumentException($"Cannot multiply {m}x{ka} matrix by {n}x{kb} matrix", nameof(b));
+
+            var kernel = accelerator.LoadStreamKernel<
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>>(
+                MatrixMultiplyTiledKernel);
+            var groupSize = new Index2D(TILE_SIZE, TILE_SIZE);
+            var numGroups = new Index2D((m + TILE_SIZE - 1) / TILE_SIZE, (n + TILE_SIZE - 1) / TILE_SIZE);
+
+            using var aBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, ka));
+            using var bBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(ka, n));
+            using var cBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, n));
+            aBuffer.CopyFromCPU(a);
+            bBuffer.CopyFromCPU(b);
+
+            kernel((numGroups, groupSize), aBuffer, bBuffer, cBuffer);
+
+            // Reads data from the GPU buffer into a new CPU array.
+            // Implicitly calls accelerator.DefaultStream.Synchronize() to ensure
+            // that the kernel and memory copy are completed first.
+            return cBuffer.GetAsArray2D();
+        }
+        static void MatrixMultiplyTiledKernel(
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            ArrayView2D<float, Stride2D.DenseX> bView,
+            ArrayView2D<float, Stride2D.DenseX> cView)
+        {
+            var global = Grid.GlobalIndex.XY;
+            var x = Group.IdxX;
+            var y = Group.IdxY;
+
+            var aTile = SharedMemory.Allocate2D<float, Stride2D.DenseX>(new Index2D(TILE_SIZE, TILE_SIZE), new Stride2D.DenseX(TILE_SIZE));
+            var bTile = SharedMemory.Allocate2D<float, Stride2D.DenseX>(new Index2D(TILE_SIZE, TILE_SIZE), new Stride2D.DenseX(TILE_SIZE));
+            var sum = 0.0f;
+
+            for (var i = 0; i < aView.IntExtent.X; i += TILE_SIZE)
+            {
+                if (global.X < aView.IntExtent.X && y + i < aView.IntExtent.Y)
+                    aTile[x, y] = aView[global.X, y + i];
+                else
+                    aTile[x, y] = 0;
+
+                if (x + i < bView.IntExtent.X && global.Y < bView.IntExtent.Y)
+                    bTile[x, y] = bView[x + i, global.Y];
+                else
+                    bTile[x, y] = 0;
+                Group.Barrier();
+
+                for (var k = 0; k < TILE_SIZE; k++)
+                    sum += aTile[new Index2D(x, k)] * bTile[new Index2D(k, y)];
+                Group.Barrier();
+            }
+
+            if (global.X < cView.IntExtent.X && global.Y < cView.IntExtent.Y)
+                cView[global] = sum;
+        }
+        void writetoCSV(float[,] array, string path, string inorout){
+            StreamWriter file = new StreamWriter(path);
+            var iLength = array.GetLength(0);
+            var jLength = array.GetLength(1);
+            for (int k = 0; k < jLength; k++)
+            {
+                
+                if(k == jLength-1)
+                    {
+                        file.Write("{1}{0}", k, inorout);
+                    }
+                    else{
+                        file.Write("{1}{0},", k, inorout);
+                    }
+                
+            }
+            file.WriteLine();
+            for (int j = 0; j < iLength; j++)
+            {
+                
+                for (int i = 0; i < jLength; i++){
+                    if(i == jLength-1)
+                    {
+                        file.Write("{0}", array[j,i]);
+                    }
+                    else{
+                        file.Write("{0},", array[j,i]);
+                    }
+                    
+                }
+                file.WriteLine();
+                file.Flush();
+            }
+        }
+
+        void writetoCSVFullClean(float[,] array1, float[,] array2, string path){
+            StreamWriter file = new StreamWriter(path);
+            var iLength = array1.GetLength(0);
+            var jLength = array1.GetLength(1);
+            var kLength = array2.GetLength(1);
+            for (int k = 0; k < jLength; k++)
+            {
+                
+                if(k == jLength-1)
+                    {
+                        file.Write("{1}{0},", k, "IN");
+                    }
+                    else{
+                        file.Write("{1}{0},", k, "IN");
+                    }
+                
+            }
+            for (int h = 0; h < kLength; h++)
+            {
+                
+                if(h == kLength-1)
+                    {
+                        file.Write("{1}{0}", h, "OUT");
+                    }
+                    else{
+                        file.Write("{1}{0},", h, "OUT");
+                    }
+                
+            }
+            file.WriteLine();
+            file.Flush();
+            for (int j = 0; j < iLength; j++)
+            {
+                
+                for (int i = 0; i < jLength; i++){
+                    if(i == jLength-1)
+                    {
+                        file.Write("{0},", array1[j,i]);
+                    }
+                    else{
+                        file.Write("{0},", array1[j,i]);
+                    }
+                    
+                }
+                for (int z = 0; z < kLength; z++){
+                    if(z == kLength-1)
+                    {
+                        file.Write("{0}", array2[j,z]);
+                    }
+                    else{
+                        file.Write("{0},", array2[j,z]);
+                    }
+                    
+                }
+                file.WriteLine();
+                file.Flush();
+            }
+        }
+    
+        static bool isEqualArrs(float[,] arr1, float[,] arr2){
+            int counter = 0;
+            if(arr1.GetLength(0) == arr2.GetLength(0) && arr1.GetLength(1) == arr2.GetLength(1)){
+                for (int i = 0; i < arr1.GetLength(0); i++)
+                {
+                    for(int j=0; j < arr1.GetLength(1); j++){
+                        if(Math.Abs(arr1[i,j] - arr2[i,j]) > .1){
+                            Console.WriteLine(Math.Abs(arr1[i,j] - arr2[i,j]) > .1);
+                            Console.Write("Counter");
+                            Console.WriteLine(i);
+                            Console.WriteLine(j);
+                            Console.WriteLine(counter);
+                            Console.Write(arr1[i,j]);
+                            Console.Write("  ");
+                            Console.WriteLine(arr2[i,j]);
+                            return false;
+                        }
+                        else{
+                            counter+=1;
+                        }
+                    //Xactual[i, 1] = ((float)q.NextDouble() * 10) + 2;
+                   
+                    }
+                }
+                return true;
+            
+            }
+            else{
+                Console.WriteLine("DIFF LENGTHS");
+                return false;
+            }
+
+        }
+
+
         static void Main(string[] args)
         {
             // //learning_rate, iterations, l1_penality, l2_penality 
-            ElasticRegression e1 = new ElasticRegression(0.005f, 10, .05f, .05f);
-            ElasticRegression e2 = new ElasticRegression(0.005f, 10, .05f, .05f);
+            ElasticRegression e1 = new ElasticRegression(0.005f, 100, .5f, .05f);
+            ElasticRegression e2 = new ElasticRegression(0.005f, 1, .005f, .005f);
+            ElasticRegression e3 = new ElasticRegression(0.005f, 10, .5f, .05f);
      
             Random q = new Random();
             //Creates input data
-            float[,] Xactual = new float[10000, 50];
+            float[,] Xactual = new float[1000000, 100];
             for (int i = 0; i < Xactual.GetLength(0); i++)
             {
                 for(int j=0; j < Xactual.GetLength(1); j++){
@@ -434,22 +833,33 @@ namespace ElasticNetRegression
                 //Xactual[i, 1] = ((float)q.NextDouble() * 10) + 2;
                
             }
-
+            Console.WriteLine("Xactual");
+            e1.writetoCSV(Xactual, "BigData1X.csv", "IN");
             //Creates output data
-            float[,] Yactual = new float[10000, 50];
-            for (int i = 0; i < Xactual.GetLength(0); i++)
+            float[,] Yactual = new float[1000000, 1];
+            Console.WriteLine(Yactual.GetLength(0));
+            Console.WriteLine(Yactual.GetLength(1));
+
+            for (int i = 0; i < Yactual.GetLength(0); i++)
             {
-                for(int j = 0; i < Xactual.GetLength(1); i++){
-                    Yactual[i, j] = ((Xactual[i, j]) * 100 + 2000);
+                for(int j = 0; j < Yactual.GetLength(1); j++){
+                    Yactual[i, j] = (((Xactual[i, j]) * 3.2f + 75));
+                    //Console.WriteLine(Yactual[i,j]);
                 }
                 // Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
                 // Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
                 //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
             }
-            
-            
+            Console.WriteLine("Yactual");
+            e1.writetoCSV(Yactual, "BigData1Y.csv", "OUT");
+            // Console.WriteLine(Xactual.GetLength(1));
+            // Console.WriteLine(Xactual.GetLength(0));
+            // Console.WriteLine(Yactual.GetLength(1));
+            // Console.WriteLine(Yactual.GetLength(0));
            
-            // Console.WriteLine("Finshed Building Data");
+
+            e1.writetoCSVFullClean(Xactual, Yactual, "BigData1.csv");
+            Console.WriteLine("Finshed Building Data");
             
             
         
@@ -472,25 +882,29 @@ namespace ElasticNetRegression
 
 
              
-            // // Stopwatch stopwatch2 = new Stopwatch();
+            // Stopwatch stopwatch2 = new Stopwatch();
 
 
-            // // stopwatch2.Start();
+            // stopwatch2.Start();
 
-            // Console.WriteLine("Before fit");
+            Console.WriteLine("Before fit");
             Stopwatch stopw1 = new Stopwatch();
             stopw1.Start();
             e1.fit(Xactual, Yactual);
             stopw1.Stop();
 
-            Stopwatch stopw2 = new Stopwatch();
-            stopw2.Start();
-            e2.fitNOGPU(Xactual, Yactual);
-            stopw2.Stop();
+            // Stopwatch stopw2 = new Stopwatch();
+            // stopw2.Start();
+            // e2.fitTILED(Xactual, Yactual);
+            // stopw2.Stop();
 
+            // Stopwatch stopwN = new Stopwatch();
+            // stopwN.Start();
+            // e3.fitNOGPU(Xactual, Yactual);
+            // stopwN.Stop();
             // // stopwatch2.Stop();
             // Console.WriteLine("Without accelerator");
-            // //
+            //
 
 
             Stopwatch stopw = new Stopwatch();
@@ -498,34 +912,85 @@ namespace ElasticNetRegression
             float[,] res = e1.predict(Xactual);
             stopw.Stop();
 
-            Stopwatch stopw3 = new Stopwatch();
-            stopw3.Start();
-            float[,] res2 = e2.predictNOGPU(Xactual);
-            stopw3.Stop();
+            // Stopwatch stopw3 = new Stopwatch();
+            // stopw3.Start();
+            // float[,] res2 = e2.predictTILED(Xactual);
+            // stopw3.Stop();
 
+            
 
+            // Stopwatch stopwN1 = new Stopwatch();
+            // stopwN1.Start();
+            // float[,] resN = e3.predictNOGPU(Xactual);
+            // stopwN1.Stop();
+
+            // Console.WriteLine("RES");
+            // e2.print2d(res);
+            // Console.WriteLine("RES2");
+            // e2.print2d(res2);   
+            // Console.WriteLine("RESN");
+            // e2.print2d(resN);
+            // Console.WriteLine("Actual");
+            // e2.print2d(Yactual);
+            
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine();
+            Console.WriteLine();
+
+            //Console.WriteLine(res2[0,1]);
+            // Console.WriteLine(isEqualArrs(res,res2));
+            // Console.WriteLine(isEqualArrs(res,resN));
             //This prints out the prediction with the actual
             // for (int i = 0; i < res.GetLength(0); i++)
             // {
             //    Console.Write(res[i, 0]);
-            //    Console.Write(" ");
-            //    Console.Write(res[i, 1]);
             //    Console.Write(" | ");
+            //    Console.Write(res[i, 1]);
+            //    Console.Write(" || ");
+            //    Console.Write(resN[i, 0]);  
+            //    Console.Write(" | ");
+            //    Console.Write(resN[i, 1]);  
+            //    Console.Write(" ||| ");
             //    Console.Write(Yactual[i, 0]);
+            //    Console.Write(" | ");
+            //    Console.Write(Yactual[i,1]);
             //    Console.Write(" ");
-            //    Console.Write(Yactual[i, 1]);
+            //    //Console.Write(Yactual[i, 1]);
 
             //    Console.WriteLine();
             // }
+            // float res1total = 0;
+            // float res2total = 0;
+            // float resNtotal = 0;
+            // int counter = 0;
+            // for(int i = 0; i < res.GetLength(0); i++){
+            //     for(int j = 0; j< res.GetLength(1); j++){
+            //         res1total += Math.Abs(Yactual[i,j]-res[i,j]);
+            //         // res2total += Math.Abs(Yactual[i,j]-res2[i,j]);
+            //         // resNtotal += Math.Abs(Yactual[i,j]-resN[i,j]);
+            //         counter +=1;
+
+            //     }
+            // }
 
             Console.WriteLine("With GPU:");
+            //Console.WriteLine(res1total/counter);
             Console.WriteLine(stopw1.Elapsed);
             Console.WriteLine(stopw.Elapsed);
 
-            Console.WriteLine("Without GPU:");
-            Console.WriteLine(stopw2.Elapsed);
-            Console.WriteLine(stopw3.Elapsed);
+            // Console.WriteLine("TILED:");
+            // Console.WriteLine(res2total/counter);
+            // Console.WriteLine(stopw2.Elapsed);
+            // Console.WriteLine(stopw3.Elapsed);
+
+            // Console.WriteLine("NO GPU:");
+            // Console.WriteLine(resNtotal/counter);
+            // Console.WriteLine(stopwN.Elapsed);
+            // Console.WriteLine(stopwN1.Elapsed);
             // Console.WriteLine("Done");
+
+
         
    
             // Context context = Context.Create(builder => builder.AllAccelerators());
@@ -549,6 +1014,32 @@ namespace ElasticNetRegression
             //     accelerator.PrintInformation();
             //     accelerator.Dispose();
             // }
+            //Context context = Context.Create(builder => builder.AllAccelerators());
+            // Device dev = context.GetPreferredDevice(preferCPU: false);
+            // Accelerator accelerate = dev.CreateAccelerator(context);
+            // float[,] arr1 = new float[10, 10];
+            // float[,] arr2 = new float[10, 10];
+
+            // for (int i = 0; i < arr1.GetLength(0); i++)
+            // {
+            //     for(int j = 0; j < arr1.GetLength(0); j++){
+            //        arr2[i,j] = 3.2f*i+j;
+            //        arr1[i,j] = 1.3f*j-i;
+            //     }
+            //     // Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
+            //     // Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
+            //     //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
+            // }
+            // Console.WriteLine("Naive");
+            // e1.print2d(e1.matrixmul(arr1, arr2));
+            // //matrixmul()
+            
+            // Console.WriteLine("GPU");
+            // e1.print2d(MatrixMultiplyAccelerated(accelerate, arr1, arr2));
+
+            // Console.WriteLine("Tiled");
+            // e1.print2d(MatrixMultiplyTiled(accelerate, arr1, arr2));
+
         }
 
         
