@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Diagnostics;
@@ -23,11 +23,65 @@ namespace ElasticNetRegression
         float L2_penality;
         float B;
         
+        // this.WBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(this.N, this.Q));
+        //     this.B = 0.0f;
+        //     this.X = X;
+        //     this.XBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( X.GetLength(0),X.GetLength(1)));
+        //     XBuffer.CopyFromCPU(X);
+        //     this.Y = Y;
+        //     this.YPredBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(0),Y.GetLength(1)));
+        //     this.YDiffBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(0),Y.GetLength(1)));
+        //     this.YBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(0),Y.GetLength(1)));
+        //     this.MatMulBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(X.GetLength(0), Y.GetLength(0)));
+        //     YBuffer.CopyFromCPU(Y);
+
         float[,] X;
+        MemoryBuffer2D<float, Stride2D.DenseX> XBuffer;
         float[,] Y;
+        MemoryBuffer2D<float, Stride2D.DenseX> YBuffer;
         float[,] W;
+        MemoryBuffer2D<float, Stride2D.DenseX> WBuffer;
+        MemoryBuffer1D<float, Stride1D.Dense> SumBuffer;
         float[,] multipliedMatrix;
+        MemoryBuffer2D<float, Stride2D.DenseX> MatMulBuffer;
+        MemoryBuffer2D<float, Stride2D.DenseX> PredMatMulBuffer;
+        MemoryBuffer2D<float, Stride2D.DenseX> dWBuffer;
         
+
+        //Different Kernals needed for GPU computations
+        Action<Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>> subtwoarrkern;
+        Action<Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>> subtwoarrkern2;
+        MemoryBuffer2D<float, Stride2D.DenseX> YDiffBuffer;
+        MemoryBuffer2D<float, Stride2D.DenseX> YPredBuffer;
+        Action<Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>> matrixmulkern;
+        Action<Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                float, float, float> updatekernel;
+        Action<Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                float> matrixaddkern;
+        Action<Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                float> matrixmulsinglekern;
+        Action<Index1D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView1D<float, Stride1D.Dense>,
+                int,int> sumofkern;
+        Action<Index1D,
+                ArrayView1D<float, Stride1D.Dense>> clearsumkern;
+
+
+
 
         Device dev;
         Accelerator accelerate;
@@ -37,7 +91,7 @@ namespace ElasticNetRegression
 
 
         //Constructor
-        public ElasticRegression(float learning_rate, int iterations, float l1_penality, float l2_penality)
+        public ElasticRegression(float learning_rate, int iterations, float l1_penality, float l2_penality, bool fullGPU = false)
         {
             ///<summary>Constructor for ElasticRegression object</summary>
             ///<param name="learning_rate">(float) learning rate of the regression</param>
@@ -58,6 +112,7 @@ namespace ElasticNetRegression
 
             this.dev = this.context.GetPreferredDevice(preferCPU: false);
             Console.WriteLine(this.dev);
+            
 
            
 
@@ -100,6 +155,230 @@ namespace ElasticNetRegression
                 this.update_weights();
             }
 
+            return this;
+        }
+
+        public ElasticRegression fitFULLGPU(float[,] X, float[,] Y, bool verbose = true)
+        {
+            ///<summary>Trains the model</summary>
+            ///<param name="X">(float[,]) A 2d array of the inputs to be trained on.</param>
+            ///<param name="Y">(float[,]) A 2d array of the target outputs, must have same length as X</param>
+            ///<param name="verbose">(boolean) Determines if the program outputs updates as it runs, default = true</param>
+
+            
+            //Number of training examples
+            this.M = X.GetLength(0)*X.GetLength(1);
+            //Number of features
+            this.N = X.GetLength(1);
+            this.numfeatures = X.GetLength(1);
+            this.accelerate = this.dev.CreateAccelerator(this.context);
+
+            this.subtwoarrkern = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>>(
+                subtwoarrsKernal);
+            this.subtwoarrkern2 = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>>(
+                subtwoarrsKernal2);
+            this.matrixmulsinglekern = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                float>(
+                multKernal);
+            this.matrixaddkern = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                float>(
+                additionKernal);
+            this.matrixmulkern = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>>(
+                MatrixMultiplyAcceleratedKernel);
+            this.updatekernel = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>,
+                float, float, float>(
+                updateweightskernal);
+            this.sumofkern = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index1D,
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView1D<float, Stride1D.Dense>,
+                int,int>(sumofkernal);
+
+            this.clearsumkern = this.accelerate.LoadAutoGroupedStreamKernel<
+                Index1D,
+                ArrayView1D<float, Stride1D.Dense>>(clearsumbuff);
+
+
+            //Number of outputs
+            this.Q = Y.GetLength(1);
+ 
+            //Initializes variables
+            this.W = new float[this.N, this.Q];
+            this.WBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(this.N, this.Q));
+            this.dWBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(this.N, this.Q));
+            this.B = 0.0f;
+            this.X = X;
+            this.XBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( X.GetLength(0),X.GetLength(1)));
+            XBuffer.CopyFromCPU(X);
+            this.Y = Y;
+            this.YPredBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(0),Y.GetLength(1)));
+            this.YDiffBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(1),Y.GetLength(0)));
+            this.YBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(Y.GetLength(0),Y.GetLength(1)));
+            Console.WriteLine(X.GetLength(1));
+            Console.WriteLine(Y.GetLength(1));
+            //Console.ReadLine();
+            this.MatMulBuffer = accelerate.Allocate2DDenseX<float>(new Index2D(Y.GetLength(1), X.GetLength(1)));
+            this.PredMatMulBuffer = accelerate.Allocate2DDenseX<float>(new Index2D(X.GetLength(0), this.Q));
+            this.SumBuffer = accelerate.Allocate1D<float>(1L);
+            YBuffer.CopyFromCPU(Y);
+            //float[,] Y_pred;
+            //float db2 = 0.0f;
+            float db = 0.0f;
+            //Gradient descent learning
+            using(this.YBuffer)
+            using(this.YPredBuffer)
+            using(this.YDiffBuffer)
+            using(this.MatMulBuffer)
+            using(this.XBuffer)
+            using(this.WBuffer)
+            using(this.dWBuffer)
+            using(this.SumBuffer)
+            using(this.accelerate)
+            //using(this.accelerate)
+            {
+                for(int i = 0; i < this.Iterations; i++)
+                {
+                    if (verbose)
+                    {
+                        Console.WriteLine("Iteration {0}/{1}", i, this.Iterations);
+                    }
+
+                    //Updates the weights after each iteration
+                    //this.update_weightsFULLGPU();
+
+                    //print2d(this.YPredBuffer.GetAsArray2D());
+                    //this.InteriorPredict();
+                    this.matrixmulkern(this.YPredBuffer.Extent.ToIntIndex(), this.XBuffer, this.WBuffer, this.YPredBuffer);
+                    this.matrixaddkern(this.YPredBuffer.Extent.ToIntIndex(), this.YPredBuffer, this.B);
+                    //print2d(this.YBuffer.GetAsArray2D());
+                    //Console.ReadLine();
+                    ///this.accelerate = this.dev.CreateAccelerator(this.context);
+                    // Y_pred = this.predict(this.X);
+                    // Console.WriteLine("YPredBuffer");
+                    // print2d(this.YPredBuffer.GetAsArray2D());
+                    // print2d(Y_pred);
+                    // Console.ReadLine();
+                    // Console.WriteLine();
+
+                    this.subtwoarrkern(this.YBuffer.Extent.ToIntIndex(), this.YBuffer, this.YPredBuffer, this.YDiffBuffer);
+                    //print2d(this.YDiffBuffer.GetAsArray2D());
+                    //Console.ReadLine();
+
+                    // Console.WriteLine("YDiffBuffer");
+                    // print2d(this.YDiffBuffer.GetAsArray2D());
+                    // print2d(subtwoarrs(this.Y, Y_pred));
+                    // Console.ReadLine();
+                    // Console.WriteLine();
+
+                    // this.multipliedMatrix = (matrixmul(subtwoarrs(this.Y, Y_pred), this.X));
+
+                    this.matrixmulkern(this.MatMulBuffer.Extent.ToIntIndex(), this.YDiffBuffer, this.XBuffer, this.MatMulBuffer);
+                    
+                    // Console.WriteLine("MatMulBuffer");
+                    // print2d(this.MatMulBuffer.GetAsArray2D());
+                    // print2d(this.multipliedMatrix);
+                    // Console.ReadLine();
+                    // Console.WriteLine();
+
+                    this.updatekernel(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.MatMulBuffer.View, this.dWBuffer.View, this.L1_penality, this.L2_penality, this.M);
+
+                    // float[,] dW = new float[this.N, this.Q];
+                    // for(int j = 0; j < this.N; j++)
+                    // {
+                    //     for(int z = 0; z < this.Q; z++){
+                    //         if (this.W[j, z] > 0)
+                    //         {
+                    //             dW[j, z] =  (((-1* this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+                    
+                    //         }
+                    //         else
+                    //         {
+                    //             dW[j, z] =  (((-1 * this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
+
+                    //         }
+                    //     }
+                        
+                    // }
+
+                    // Console.WriteLine("DW");
+                    // print2d(this.dWBuffer.GetAsArray2D());
+                    // print2d(dW);
+                    // Console.ReadLine();
+                    // Console.WriteLine();
+
+                    this.clearsumkern(this.SumBuffer.Extent.ToIntIndex(), this.SumBuffer.View);
+                    //this.sumofkern(this.YDiffBuffer.Extent.ToIntIndex(), this.YDiffBuffer.View, this.SumBuffer.Extent.ToIntIndex(),  this.SumBuffer.View);
+                    this.sumofkern(this.SumBuffer.Extent.ToIntIndex(), this.YDiffBuffer.View, this.SumBuffer.View, this.YDiffBuffer.Extent.ToIntIndex().X, this.YDiffBuffer.Extent.ToIntIndex().Y);
+                    // Console.WriteLine("SumBuffer");
+                    // print1d(this.SumBuffer.GetAsArray1D());
+                    // Console.WriteLine(this.SumBuffer.GetAsArray1D()[0]/this.M);
+                    //db2 = (-(2.0F * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+                    // Console.WriteLine("DB");
+                    // Console.WriteLine(ysum(subtwoarrs(this.Y, Y_pred)));
+                    // Console.WriteLine(db);
+                    // Console.ReadLine();
+                    db = (- 2.0F * this.SumBuffer.GetAsArray1D()[0])/this.M;
+                    //float db = (-(ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+
+                    
+                    // Console.WriteLine("DB");
+                    // Console.WriteLine(db);
+                    // Console.WriteLine(db2);
+                    // Console.ReadLine();
+                    // Console.ReadLine();
+
+                    // Console.WriteLine("Test");
+                    // this.print2d(this.W);
+                    // Console.WriteLine();
+                    // this.print2d(dW);
+                    // Console.WriteLine("Pre^");
+                    // Console.WriteLine("WBUffer");
+                    // print2d(this.WBuffer.GetAsArray2D());
+                    // Console.WriteLine("dWBuffer");
+                    // print2d(this.dWBuffer.GetAsArray2D());
+                    this.matrixmulsinglekern(this.dWBuffer.Extent.ToIntIndex(), this.dWBuffer, this.Learning_rate);
+                    this.subtwoarrkern2(this.WBuffer.Extent.ToIntIndex(), this.WBuffer, this.dWBuffer);
+
+                    //this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
+                    // Console.WriteLine("New W");
+                    // print2d(this.WBuffer.GetAsArray2D());
+                    // print2d(this.dWBuffer.GetAsArray2D());
+                    // print2d(this.W);
+                    // Console.ReadLine();
+
+                    // Console.WriteLine("UpdatedW Bufffer");
+                    // print2d(this.dWBuffer.GetAsArray2D());
+                    //this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
+                    // this.print2d(this.W);
+                    // Console.ReadLine();
+                    this.B = this.B - (this.Learning_rate * db);
+
+                }
+                this.W = this.WBuffer.GetAsArray2D();
+            }
+            // print2d(this.W);
+            // Console.ReadLine();
+            
+            this.accelerate.Dispose();
             return this;
         }
         public ElasticRegression fitTILED(float[,] X, float[,] Y, bool verbose = true)
@@ -160,6 +439,8 @@ namespace ElasticNetRegression
             this.X = X;
             this.Y = Y;
 
+
+             
             //Gradient descent learning
             for(int i = 0; i < this.Iterations; i++)
             {
@@ -171,7 +452,7 @@ namespace ElasticNetRegression
                 //Updates the weights after each iteration
                 this.update_weightsNOGPU();
             }
-
+            
             return this;
         }
 
@@ -236,64 +517,19 @@ namespace ElasticNetRegression
                 for(int z = 0; z < this.Q; z++){
                     if (this.W[j, z] > 0)
                     {
-
-
-
-
                         dW[j, z] =  (((-1* this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
-                        // Console.WriteLine("CompA:");
-                        // Console.WriteLine(this.multipliedMatrix[z,j]);
-                        // Console.WriteLine("Base:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Four1:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (4.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Four2");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (4 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Num Feature1:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (this.numfeatures + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Num Feature2:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (this.numfeatures * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Minus");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) - (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("No Double");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * this.L1_penality)) - (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Div:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j]/this.M * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("MISC");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * this.L1_penality)) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        //Console.ReadLine();
+            
                     }
                     else
                     {
                         dW[j, z] =  (((-1 * this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
-                        // Console.WriteLine("CompB:");
-                        // Console.WriteLine(this.multipliedMatrix[z,j]);
-                        // Console.WriteLine("Base:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Four1:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (4.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Four2");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (4 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Num Feature1:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (this.numfeatures + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Num Feature2:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (this.numfeatures * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Minus");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) - (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("No Double");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j] * this.L1_penality)) - (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("Div:");
-                        // Console.WriteLine((((-this.multipliedMatrix[z, j]/this.M * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M);
-                        // Console.WriteLine("MISC");
-                        // Console.WriteLine( (((-1* this.multipliedMatrix[z, j] * - this.L1_penality)) + (2 * this.L2_penality * this.W[j, z])) / this.M);
 
-                        //Console.ReadLine();
                     }
                 }
                 
             }
 
-            float db = (-(ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+            float db = (-(2.0F * ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
 
 
             // Console.WriteLine("DB");
@@ -357,6 +593,106 @@ namespace ElasticNetRegression
             return this;
         }
 
+
+
+        public ElasticRegression update_weightsFULLGPU()
+        {
+            //Generate a prediction based on inputs
+            //float[,] Y_pred = this.predict(this.X);
+            Console.WriteLine("YPREDBUFFer");
+            using(this.YBuffer)
+            using(this.YPredBuffer)
+            using(this.YDiffBuffer)
+            using(this.MatMulBuffer)
+            using(this.XBuffer)
+            using(this.WBuffer)
+            using(this.dWBuffer)
+            using(this.SumBuffer)
+            using(this.accelerate)
+            //using(this.accelerate)
+            {
+                print2d(this.YPredBuffer.GetAsArray2D());
+                //this.InteriorPredict();
+                this.matrixmulkern(this.YPredBuffer.Extent.ToIntIndex(), this.XBuffer, this.WBuffer, this.YPredBuffer);
+                this.matrixaddkern(this.YPredBuffer.Extent.ToIntIndex(), this.YPredBuffer, this.B);
+                print2d(this.YBuffer.GetAsArray2D());
+                Console.ReadLine();
+                //this.accelerate = this.dev.CreateAccelerator(this.context);
+
+                Console.WriteLine("YDiffBuffer");
+                print2d(this.YDiffBuffer.GetAsArray2D());
+                
+
+                this.subtwoarrkern(this.YBuffer.Extent.ToIntIndex(), this.YBuffer, this.YPredBuffer, this.YDiffBuffer);
+                print2d(this.YDiffBuffer.GetAsArray2D());
+                Console.ReadLine();
+                
+
+                this.matrixmulkern(this.MatMulBuffer.Extent.ToIntIndex(), this.YDiffBuffer, this.XBuffer, this.MatMulBuffer);
+                //Multiplied matrix has # of Youtputs rows and # of X features columns
+                //this.multipliedMatrix = (MatrixMultiplyAccelerated(this.accelerate, subtwoarrs(this.Y, Y_pred), this.X));
+            
+                //float[,] dW = new float[this.N, this.Q];
+                ///Can make this a kernal
+                // for(int j = 0; j < this.N; j++)
+                // {
+                //     for(int z = 0; z < this.Q; z++){
+                //         if (this.W[j, z] > 0)
+                //         {
+
+                //             dW[j, z] =  (((-1* this.MatMulBuffer[new Index2D(z,j)] * (2.0f + this.L1_penality))) + ( this.L2_penality * this.WBuffer[new Index2D(j,z)])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+
+                //         }
+                //         else
+                //         {
+                //             dW[j, z] =  (((-1 * this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + ( this.L2_penality * this.W[j, z])) / this.M; //(((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
+
+                //         }
+                //     }
+                    
+                // }
+                
+                this.updatekernel(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.MatMulBuffer.View, this.dWBuffer.View, this.L1_penality, this.L2_penality, this.M);
+                this.clearsumkern(this.SumBuffer.Extent.ToIntIndex(), this.SumBuffer.View);
+                //this.sumofkern(this.YDiffBuffer.Extent.ToIntIndex(), this.YDiffBuffer.View,this.SumBuffer.Extent.ToIntIndex(), this.SumBuffer.View);
+                this.sumofkern(this.SumBuffer.Extent.ToIntIndex(), this.YDiffBuffer.View, this.SumBuffer.View, this.YDiffBuffer.Extent.ToIntIndex().X, this.YDiffBuffer.Extent.ToIntIndex().Y);
+                float db = (- 2.0F * this.SumBuffer.GetAsArray1D()[0])/this.M;
+                //float db = (-(ysum(subtwoarrs(this.Y, Y_pred)))) / this.M;
+
+
+                // Console.WriteLine("DB");
+                // Console.WriteLine(db);
+                // Console.ReadLine();
+                // Console.ReadLine();
+
+                // Console.WriteLine("Test");
+                // this.print2d(this.W);
+                // Console.WriteLine();
+                // this.print2d(dW);
+                // Console.WriteLine("Pre^");
+                this.subtwoarrkern(this.WBuffer.Extent.ToIntIndex(), this.WBuffer, this.dWBuffer, this.WBuffer);
+                //this.W = subtwo2darrs(this.W, applymul(dW, this.Learning_rate));
+                // this.print2d(this.W);
+                // Console.ReadLine();
+                this.B = this.B - (this.Learning_rate * db);
+
+            }
+            return this;
+        }
+
+        static void clearsumbuff(Index1D index, ArrayView1D<float, Stride1D.Dense> sum){
+            sum[index] = 0.0f;
+        }
+        static void sumofkernal(Index1D index, ArrayView2D<float, Stride2D.DenseX> aView,ArrayView1D<float, Stride1D.Dense> sum, int dim1, int dim2){
+            for(int i = 0; i < dim1; i++){
+               for(int j = 0; j < dim2; j++){
+                    sum[index] += aView[new Index2D(i,j)];
+                } 
+            }
+            
+
+            
+        }
         public ElasticRegression update_weightsNOGPU()
         {
             //Generate a prediction based on inputs
@@ -436,6 +772,32 @@ namespace ElasticNetRegression
             return c;
         }
 
+
+
+        static float[,] kernalTester(Accelerator accelerator, float[,] a, float[,] b){
+            var m = a.GetLength(0);
+            var ka = a.GetLength(1);
+            var kb = b.GetLength(0);
+            var n = b.GetLength(1);
+
+            var kernal =  accelerator.LoadAutoGroupedStreamKernel<
+                Index2D,
+                ArrayView2D<float, Stride2D.DenseX>, 
+                ArrayView2D<float, Stride2D.DenseX>,
+                ArrayView2D<float, Stride2D.DenseX>>(
+                subtwoarrsKernal);
+
+            using var aBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, ka));
+            using var bBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, ka));
+            using var cBuffer = accelerator.Allocate2DDenseX<float>(new Index2D(m, ka));
+
+            aBuffer.CopyFromCPU(a);
+            bBuffer.CopyFromCPU(b);
+
+            kernal(aBuffer.Extent.ToIntIndex(),aBuffer.View, bBuffer.View, cBuffer.View);
+
+            return cBuffer.GetAsArray2D();
+        }
         static float[,] MatrixMultiplyAccelerated(Accelerator accelerator, float[,] a, float[,] b)
         {
             var m = a.GetLength(0);
@@ -467,6 +829,101 @@ namespace ElasticNetRegression
             return cBuffer.GetAsArray2D();
         }
 
+        static void updateweightskernal(Index2D index,  
+            ArrayView2D<float, Stride2D.DenseX> WView,
+            ArrayView2D<float, Stride2D.DenseX> MMView,
+            ArrayView2D<float, Stride2D.DenseX> DwView,
+            float L1,
+            float L2,
+            float M){
+
+            if (WView[index] > 0)
+            {
+
+                DwView[index] =  (((-1* MMView[new Index2D(index.Y,index.X)] * (2.0f + L1))) + (L2 * WView[index])) / M; //(((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
+
+            }
+            else
+            {
+                DwView[index] =  (((-1 * MMView[new Index2D(index.Y,index.X)] * (2.0f - L1))) + (L2 * WView[index])) / M; //(((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
+
+            }
+
+        }
+        static void additionKernal(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            float addvalue
+            ){
+            // var  xindex = index.X;
+            // //var sum = 0.0f;
+            // for (var i = 0; i < aView.IntExtent.Y; i++){
+            //      aView[new Index2D(xindex,i)] = aView[new Index2D(xindex,i)] + addvalue;
+            // }
+            //bView[index] = sum;
+
+            aView[index] += addvalue;
+        }
+        static void multKernal(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            float multvalue
+            ){
+            aView[index] = aView[index] * multvalue;
+
+        }
+
+        static void subKernal(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            float subvalue
+            ){
+
+            aView[index] = aView[index] - subvalue;
+           
+
+        }
+        static void divKernal(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            float divvalue
+            ){
+            aView[index] = aView[index]/divvalue;
+            
+
+        }
+
+        static void subtwoarrsKernal(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            ArrayView2D<float, Stride2D.DenseX> bView,
+            ArrayView2D<float, Stride2D.DenseX> cView){
+            // var xindex = index.X;
+            
+            // for (var i= 0; i< aView.IntExtent.Y; i++){
+                
+            //     cView[new Index2D(i, xindex)] = aView[new Index2D(xindex, i)] - bView[new Index2D(xindex, i)];
+            // }
+            
+            //cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
+            cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
+            
+        }
+        static void subtwoarrsKernal2(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            ArrayView2D<float, Stride2D.DenseX> bView){
+            // var xindex = index.X;
+            
+            // for (var i= 0; i< aView.IntExtent.Y; i++){
+                
+            //     cView[new Index2D(i, xindex)] = aView[new Index2D(xindex, i)] - bView[new Index2D(xindex, i)];
+            // }
+            
+            //cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
+            aView[index] = aView[index] - bView[index];
+            
+        }
 
         static void MatrixMultiplyAcceleratedKernel(
             Index2D index,
@@ -483,7 +940,34 @@ namespace ElasticNetRegression
 
             cView[index] = sum;
         }
+        static void MatMulKernal(
+            Index2D index,
+            ArrayView2D<float, Stride2D.DenseX> aView,
+            ArrayView2D<float, Stride2D.DenseX> bView,
+            ArrayView2D<float, Stride2D.DenseX> cView)
+        {
+            var x = index.X;
+            var y = index.Y;
+            var sum = 0.0f;
 
+            for (var i = 0; i < aView.IntExtent.Y; i++)
+                sum += aView[new Index2D(x, i)] * bView[new Index2D(i, y)];
+
+            cView[index] = sum;
+        }
+        /*
+        for (i = 0; i < m; i++)
+                {
+                    for (j = 0; j < q; j++)
+                    {
+                        c[i, j] = 0;
+                        for (int k = 0; k < n; k++)
+                        {
+                            c[i, j] += x[i, k] * y[k, j];
+                        }
+                    }
+                }
+        */
         //Predicts outputs based off of x
 
         float[,] predict(float[,] x)
@@ -501,6 +985,55 @@ namespace ElasticNetRegression
             // Console.ReadLine();
             this.accelerate.Dispose();
             return prediction;
+        }
+        float[,] predictFULLGPU(float[,] x)
+            ///<summary>Predicts output based off of x</summary>
+            ///<param name="x">Array of inputs</param>
+        { 
+            this.accelerate = this.dev.CreateAccelerator(this.context);
+
+            float[,] prediction = applyadd(MatrixMultiplyAccelerated(this.accelerate, x, this.W), this.B);
+
+            // Console.WriteLine("Prediction");
+            // print2d(prediction);
+            // Console.WriteLine("this.W");
+            // print2d(this.W);
+            // Console.ReadLine();
+            this.accelerate.Dispose();
+            return prediction;
+        }
+        void InteriorPredict()
+            ///<summary>Predicts output based off of x</summary>
+            ///<param name="x">Array of inputs</param>
+        { 
+
+            // this.matrixaddkern = this.accelerate.LoadAutoGroupedStreamKernel<
+            //     Index2D,
+            //     ArrayView2D<float, Stride2D.DenseX>,
+            //     float>(
+            //     additionKernal);
+            // this.matrixmulkern = this.accelerate.LoadAutoGroupedStreamKernel<
+            //     Index2D,
+            //     ArrayView2D<float, Stride2D.DenseX>,
+            //     ArrayView2D<float, Stride2D.DenseX>,
+            //     ArrayView2D<float, Stride2D.DenseX>>(
+            //     MatrixMultiplyAcceleratedKernel);
+            Console.WriteLine("Here");
+            using(this.YPredBuffer)
+            using(this.YBuffer)
+            using(this.WBuffer){
+                this.matrixmulkern(this.YPredBuffer.Extent.ToIntIndex(), this.XBuffer, this.WBuffer, this.YPredBuffer);
+                this.matrixaddkern(this.YPredBuffer.Extent.ToIntIndex(), this.YPredBuffer, this.B);
+            }
+            Console.WriteLine("oUT");
+            //float[,] prediction = applyadd(MatrixMultiplyAccelerated(this.accelerate, x, this.W), this.B);
+
+            // Console.WriteLine("Prediction");
+            // print2d(prediction);
+            // Console.WriteLine("this.W");
+            // print2d(this.W);
+            // Console.ReadLine();
+            //this.accelerate.Dispose();
         }
         float[,] predictTILED(float[,] x)
             ///<summary>Predicts output based off of x</summary>
@@ -549,7 +1082,7 @@ namespace ElasticNetRegression
             }
             return temp;
         }
-        
+
         
         float[,] subtwoarrs(float[,] arr, float[,] val)
             ///<summary>subtracts the values of an array from another one, and returns the results, with the rows and columns switched</summary>
@@ -588,7 +1121,9 @@ namespace ElasticNetRegression
             float total = 0;
             for (int i = 0; i < y.GetLength(1); i++)
             {
-                total = total + y[0, i];
+                for (int j = 0; j < y.GetLength(0); j++){
+                    total = total + y[j, i];
+                }    
             }
             return total;
         }
@@ -813,15 +1348,43 @@ namespace ElasticNetRegression
             }
 
         }
-
+        float sumof(float[,] arr, int row){
+            float sum = 0.0f;
+            for(int i = 0; i < arr.GetLength(1); i++){
+                sum += arr[row, i];
+            }
+            return sum;
+        }
 
         static void Main(string[] args)
         {
             // //learning_rate, iterations, l1_penality, l2_penality 
-            ElasticRegression e1 = new ElasticRegression(0.005f, 100, .5f, .05f);
-            ElasticRegression e2 = new ElasticRegression(0.005f, 1, .005f, .005f);
-            ElasticRegression e3 = new ElasticRegression(0.005f, 10, .5f, .05f);
-     
+            ElasticRegression e1 = new ElasticRegression(0.005f, 100, 1.5f,  .5f);
+            ElasticRegression e2 = new ElasticRegression(0.005f, 100, 1.5f, .5f);
+            ElasticRegression e3 = new ElasticRegression(0.005f, 10, .5f, .5f);
+        
+
+            // float[,] kernaltesta = new float[10,10];
+            // float[,] kernaltestb = new float[10,10];
+            // float county = 0.0f;
+            // for (int i = 0; i < kernaltesta.GetLength(0); i++)
+            // {
+            //     for(int j=0; j < kernaltesta.GetLength(1); j++){
+            //         kernaltesta[i, j] = 5.4f + county;
+            //         kernaltestb[i, j] = 10.3f + county;
+            //         county +=1;
+
+            //     }
+            //     //Xactual[i, 1] = ((float)q.NextDouble() * 10) + 2;
+               
+            // }
+            // Context context = Context.Create(builder => builder.AllAccelerators());
+            // Device dev = context.GetPreferredDevice(preferCPU: false);
+            // Accelerator aa = dev.CreateAccelerator(context);
+            // e1.print2d(kernalTester(aa, kernaltesta, kernaltestb));
+            // Console.ReadLine();
+            // aa.Dispose();
+
             Random q = new Random();
             //Creates input data
             float[,] Xactual = new float[1000000, 100];
@@ -834,7 +1397,7 @@ namespace ElasticNetRegression
                
             }
             Console.WriteLine("Xactual");
-            e1.writetoCSV(Xactual, "BigData1X.csv", "IN");
+            e1.writetoCSV(Xactual, "BigData2X.csv", "IN");
             //Creates output data
             float[,] Yactual = new float[1000000, 1];
             Console.WriteLine(Yactual.GetLength(0));
@@ -843,7 +1406,7 @@ namespace ElasticNetRegression
             for (int i = 0; i < Yactual.GetLength(0); i++)
             {
                 for(int j = 0; j < Yactual.GetLength(1); j++){
-                    Yactual[i, j] = (((Xactual[i, j]) * 3.2f + 75));
+                    Yactual[i, j] = ((e1.sumof(Xactual, i) * 3.2f + 75));
                     //Console.WriteLine(Yactual[i,j]);
                 }
                 // Yactual[i, 0] = ((Xactual[i, 0]) * 1000 + 2000);
@@ -851,14 +1414,14 @@ namespace ElasticNetRegression
                 //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
             }
             Console.WriteLine("Yactual");
-            e1.writetoCSV(Yactual, "BigData1Y.csv", "OUT");
+            e1.writetoCSV(Yactual, "BigData2Y.csv", "OUT");
             // Console.WriteLine(Xactual.GetLength(1));
             // Console.WriteLine(Xactual.GetLength(0));
             // Console.WriteLine(Yactual.GetLength(1));
             // Console.WriteLine(Yactual.GetLength(0));
            
 
-            e1.writetoCSVFullClean(Xactual, Yactual, "BigData1.csv");
+            e1.writetoCSVFullClean(Xactual, Yactual, "BigData2.csv");
             Console.WriteLine("Finshed Building Data");
             
             
@@ -886,6 +1449,11 @@ namespace ElasticNetRegression
 
 
             // stopwatch2.Start();
+            Stopwatch stopw2 = new Stopwatch();
+            stopw2.Start();
+            e2.fitFULLGPU(Xactual, Yactual);
+            stopw2.Stop();
+
 
             Console.WriteLine("Before fit");
             Stopwatch stopw1 = new Stopwatch();
@@ -893,11 +1461,7 @@ namespace ElasticNetRegression
             e1.fit(Xactual, Yactual);
             stopw1.Stop();
 
-            // Stopwatch stopw2 = new Stopwatch();
-            // stopw2.Start();
-            // e2.fitTILED(Xactual, Yactual);
-            // stopw2.Stop();
-
+            
             // Stopwatch stopwN = new Stopwatch();
             // stopwN.Start();
             // e3.fitNOGPU(Xactual, Yactual);
@@ -912,10 +1476,10 @@ namespace ElasticNetRegression
             float[,] res = e1.predict(Xactual);
             stopw.Stop();
 
-            // Stopwatch stopw3 = new Stopwatch();
-            // stopw3.Start();
-            // float[,] res2 = e2.predictTILED(Xactual);
-            // stopw3.Stop();
+            Stopwatch stopw3 = new Stopwatch();
+            stopw3.Start();
+            float[,] res2 = e2.predict(Xactual);
+            stopw3.Stop();
 
             
 
@@ -960,29 +1524,32 @@ namespace ElasticNetRegression
 
             //    Console.WriteLine();
             // }
-            // float res1total = 0;
-            // float res2total = 0;
-            // float resNtotal = 0;
-            // int counter = 0;
-            // for(int i = 0; i < res.GetLength(0); i++){
-            //     for(int j = 0; j< res.GetLength(1); j++){
-            //         res1total += Math.Abs(Yactual[i,j]-res[i,j]);
-            //         // res2total += Math.Abs(Yactual[i,j]-res2[i,j]);
-            //         // resNtotal += Math.Abs(Yactual[i,j]-resN[i,j]);
-            //         counter +=1;
+           float res1total = 0;
+           float res2total = 0;
+            //float resNtotal = 0;
+            int counter = 0;
+            for(int i = 0; i < res.GetLength(0); i++){
+                for(int j = 0; j< res.GetLength(1); j++){
+                    Console.Write(Yactual[i,j]);
+                    Console.Write(" | ");
+                    Console.WriteLine(res2[i,j]);
+                    res1total += Math.Abs(Yactual[i,j]-res[i,j]);
+                    res2total += Math.Abs(Yactual[i,j]-res2[i,j]);
+                    // resNtotal += Math.Abs(Yactual[i,j]-resN[i,j]);
+                    counter +=1;
 
-            //     }
-            // }
+                }
+            }
 
             Console.WriteLine("With GPU:");
-            //Console.WriteLine(res1total/counter);
+            Console.WriteLine(res1total/counter);
             Console.WriteLine(stopw1.Elapsed);
             Console.WriteLine(stopw.Elapsed);
 
-            // Console.WriteLine("TILED:");
-            // Console.WriteLine(res2total/counter);
-            // Console.WriteLine(stopw2.Elapsed);
-            // Console.WriteLine(stopw3.Elapsed);
+            Console.WriteLine("FULL GPU:");
+            Console.WriteLine(res2total/counter);
+            Console.WriteLine(stopw2.Elapsed);
+            Console.WriteLine(stopw3.Elapsed);
 
             // Console.WriteLine("NO GPU:");
             // Console.WriteLine(resNtotal/counter);
