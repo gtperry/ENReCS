@@ -16,24 +16,26 @@ namespace ElasticNetRegression
         int M;
         int N;
         int Q;
-        int numfeatures;
 
         float Learning_rate;
         float L1_penality;
         float L2_penality;
         float B;
 
-        float[,] X;
-        MemoryBuffer2D<float, Stride2D.DenseX> XBuffer;
-        float[,] Y;
-        MemoryBuffer2D<float, Stride2D.DenseX> YBuffer;
         float[,] W;
+        float[,] X;
+        float[,] Y;
+
+        //Memory Buffers Used in GPU computations
+        MemoryBuffer2D<float, Stride2D.DenseX> XBuffer;
+        MemoryBuffer2D<float, Stride2D.DenseX> YBuffer;
         MemoryBuffer2D<float, Stride2D.DenseX> WBuffer;
         MemoryBuffer1D<float, Stride1D.Dense> SumBuffer;
         MemoryBuffer2D<float, Stride2D.DenseX> MatMulBuffer;
         MemoryBuffer2D<float, Stride2D.DenseX> PredMatMulBuffer;
         MemoryBuffer2D<float, Stride2D.DenseX> dWBuffer;
-        
+        MemoryBuffer2D<float, Stride2D.DenseX> YDiffBuffer;
+        MemoryBuffer2D<float, Stride2D.DenseX> YPredBuffer;
 
         //Different Kernals needed for GPU computations
         Action<Index2D,
@@ -43,8 +45,6 @@ namespace ElasticNetRegression
         Action<Index2D,
                 ArrayView2D<float, Stride2D.DenseX>,
                 ArrayView2D<float, Stride2D.DenseX>> subtwoarrkern2;
-        MemoryBuffer2D<float, Stride2D.DenseX> YDiffBuffer;
-        MemoryBuffer2D<float, Stride2D.DenseX> YPredBuffer;
         Action<Index2D,
                 ArrayView2D<float, Stride2D.DenseX>,
                 ArrayView2D<float, Stride2D.DenseX>,
@@ -98,11 +98,6 @@ namespace ElasticNetRegression
             this.L2_penality = l2_penality;
 
             this.dev = this.context.GetPreferredDevice(preferCPU: false);
-            Console.WriteLine(this.dev);
-            
-
-           
-
 
         }
 
@@ -118,9 +113,11 @@ namespace ElasticNetRegression
             this.M = X.GetLength(0)*X.GetLength(1);
             //Number of features
             this.N = X.GetLength(1);
-            this.numfeatures = X.GetLength(1);
+
+            //Initializes accelerator
             this.accelerate = this.dev.CreateAccelerator(this.context);
 
+            //Initialize Kernels for use with the GPU
             this.subtwoarrkern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index2D,
                 ArrayView2D<float, Stride2D.DenseX>,
@@ -160,7 +157,6 @@ namespace ElasticNetRegression
                 ArrayView2D<float, Stride2D.DenseX>,
                 ArrayView1D<float, Stride1D.Dense>,
                 int,int>(sumofkernal);
-
             this.clearsumkern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<float, Stride1D.Dense>>(clearsumbuff);
@@ -170,23 +166,47 @@ namespace ElasticNetRegression
             this.Q = Y.GetLength(1);
  
             //Initializes variables
+            //The weights of the model
             this.W = new float[this.N, this.Q];
+
+            //Buffer to store the weights during GPU running
             this.WBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(this.N, this.Q));
+
+            //Buffer to store the temporary weight changes
             this.dWBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(this.N, this.Q));
+
+
             this.B = 0.0f;
+            
+
+            //Initializes the buffer for training data features
             this.X = X;
             this.XBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( X.GetLength(0),X.GetLength(1)));
-            XBuffer.CopyFromCPU(X);
+            XBuffer.CopyFromCPU(this.X);
+
+            //Initializes the buffer for training data outputs
             this.Y = Y;
+            this.YBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(Y.GetLength(0),Y.GetLength(1)));
+            YBuffer.CopyFromCPU(this.Y);
+
+
+            //Buffers for working with prediction and diff of Y
             this.YPredBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(0),Y.GetLength(1)));
             this.YDiffBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D( Y.GetLength(1),Y.GetLength(0)));
-            this.YBuffer = this.accelerate.Allocate2DDenseX<float>(new Index2D(Y.GetLength(0),Y.GetLength(1)));
+            
+            //Buffers used for matrix multiplication
             this.MatMulBuffer = accelerate.Allocate2DDenseX<float>(new Index2D(Y.GetLength(1), X.GetLength(1)));
             this.PredMatMulBuffer = accelerate.Allocate2DDenseX<float>(new Index2D(X.GetLength(0), this.Q));
+
+            //Helper buffer to calculate the sum of the YDiffBuffer
             this.SumBuffer = accelerate.Allocate1D<float>(1L);
-            YBuffer.CopyFromCPU(Y);
+            
             float db = 0.0f;
+
             //Gradient descent learning
+
+
+            //Using Buffers in order to edit them on each iteration
             using(this.YBuffer)
             using(this.YPredBuffer)
             using(this.YDiffBuffer)
@@ -204,27 +224,40 @@ namespace ElasticNetRegression
                         Console.WriteLine("Iteration {0}/{1}", i, this.Iterations);
                     }
 
+                    //Gets the prediction based on the WBuffer
                     this.matrixmulkern(this.YPredBuffer.Extent.ToIntIndex(), this.XBuffer, this.WBuffer, this.YPredBuffer);
                     this.matrixaddkern(this.YPredBuffer.Extent.ToIntIndex(), this.YPredBuffer, this.B);
 
+
+                    //Gets the difference between YActual and YPrediction and puts it in YDiffBuffer
                     this.subtwoarrkern(this.YBuffer.Extent.ToIntIndex(), this.YBuffer, this.YPredBuffer, this.YDiffBuffer);
 
+                    //Multiply error by the actual xbuffer
                     this.matrixmulkern(this.MatMulBuffer.Extent.ToIntIndex(), this.YDiffBuffer, this.XBuffer, this.MatMulBuffer);
 
+
+                    //Update dWbuffer
                     this.updatekernel(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.MatMulBuffer.View, this.dWBuffer.View, this.L1_penality, this.L2_penality, this.M);
 
+                    //Set Sumbuffer to 0
                     this.clearsumkern(this.SumBuffer.Extent.ToIntIndex(), this.SumBuffer.View);
                     
+                    //Get the sum of YDiff Buffer
                     this.sumofkern(this.SumBuffer.Extent.ToIntIndex(), this.YDiffBuffer.View, this.SumBuffer.View, this.YDiffBuffer.Extent.ToIntIndex().X, this.YDiffBuffer.Extent.ToIntIndex().Y);
+
 
                     db = (- 2.0F * this.SumBuffer.GetAsArray1D()[0])/this.M;
 
+                    //Multiply dWBuffer by the learning rate
                     this.matrixmulsinglekern(this.dWBuffer.Extent.ToIntIndex(), this.dWBuffer, this.Learning_rate);
+
+                    //Sub the dWBuffer from the WBuffer
                     this.subtwoarrkern2(this.WBuffer.Extent.ToIntIndex(), this.WBuffer, this.dWBuffer);
 
                     this.B = this.B - (this.Learning_rate * db);
 
                 }
+                //Move the weights out of GPU to be used for predictions
                 this.W = this.WBuffer.GetAsArray2D();
             }
 
@@ -233,17 +266,23 @@ namespace ElasticNetRegression
         }
         
         static void clearsumbuff(Index1D index, ArrayView1D<float, Stride1D.Dense> sum){
+            ///<summary>Sets the sumbuffer to 0</summary>
+            ///<param name="index">(Index1D) Index to iterate through the array</param>
+            ///<param name="sum">(ArrayView1D<float, Stride1D.Dense>) Buffer</param>
             sum[index] = 0.0f;
         }
         static void sumofkernal(Index1D index, ArrayView2D<float, Stride2D.DenseX> aView,ArrayView1D<float, Stride1D.Dense> sum, int dim1, int dim2){
+            ///<summary>Adds up everything in a 2DBuffer.</summary>
+            ///<param name="index">(Index1D) Index to iterate through the array</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer to be added up</param>
+            ///<param name="sum">(ArrayView1D<float, Stride1D.Dense>) Buffer for the sum</param>
+            ///<param name="dim1">(int) First dimension of aView</param>
+            ///<param name="dim2">(int) Second dimension of aView</param>
             for(int i = 0; i < dim1; i++){
                for(int j = 0; j < dim2; j++){
                     sum[index] += aView[new Index2D(i,j)];
                 } 
-            }
-            
-
-            
+            } 
         }
 
 
@@ -279,17 +318,22 @@ namespace ElasticNetRegression
             float L1,
             float L2,
             float M){
+            ///<summary> Update dWBuffer</summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="WView">(ArrayView2D<float, Stride2D.DenseX>) Weight buffer </param>
+            ///<param name="MMView">(ArrayView2D<float, Stride2D.DenseX>) Matrix Mul Buffer</param>
+            ///<param name="DwView">(ArrayView2D<float, Stride2D.DenseX>) New weight buffer</param>
+            ///<param name="L1">(float) L1 penalty</param>
+            ///<param name="L2">(float) L2 penalty</param>
+            ///<param name="M">(float) Total size of data</param>
 
-            if (WView[index] > 0)
+            if (WView[index] > 0)  
             {
-
                 DwView[index] =  (((-1* MMView[new Index2D(index.Y,index.X)] * (2.0f + L1))) + (L2 * WView[index])) / M; //(((-this.multipliedMatrix[z, j] * (2.0f + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
-
             }
             else
             {
                 DwView[index] =  (((-1 * MMView[new Index2D(index.Y,index.X)] * (2.0f - L1))) + (L2 * WView[index])) / M; //(((-this.multipliedMatrix[z, j] * (2.0f - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
-
             }
 
         }
@@ -298,6 +342,10 @@ namespace ElasticNetRegression
             ArrayView2D<float, Stride2D.DenseX> aView,
             float addvalue
             ){
+            ///<summary> Adds a single value to every element in an ArrayView </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer the value is being added to</param>
+            ///<param name="addvalue">(float) Value being added to the ArrayView</param>
             aView[index] += addvalue;
         }
         static void multKernal(
@@ -305,8 +353,11 @@ namespace ElasticNetRegression
             ArrayView2D<float, Stride2D.DenseX> aView,
             float multvalue
             ){
+            ///<summary> Adds a single value to every element in an ArrayView </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer the value is being added to</param>
+            ///<param name="multvalue">(float) Value being multiplied to every element of the ArrayView</param>
             aView[index] = aView[index] * multvalue;
-
         }
 
         static void subKernal(
@@ -314,6 +365,10 @@ namespace ElasticNetRegression
             ArrayView2D<float, Stride2D.DenseX> aView,
             float subvalue
             ){
+            ///<summary> Adds a single value to every element in an ArrayView </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer the value is being added to</param>
+            ///<param name="subvalue">(float) Value being subtracted to the ArrayView</param>
             aView[index] = aView[index] - subvalue;
         }
         static void divKernal(
@@ -321,6 +376,10 @@ namespace ElasticNetRegression
             ArrayView2D<float, Stride2D.DenseX> aView,
             float divvalue
             ){
+            ///<summary> Adds a single value to every element in an ArrayView </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer the value is being added to</param>
+            ///<param name="divvalue">(float) Value being divided from the ArrayView</param>
             aView[index] = aView[index]/divvalue;
             
 
@@ -331,14 +390,12 @@ namespace ElasticNetRegression
             ArrayView2D<float, Stride2D.DenseX> aView,
             ArrayView2D<float, Stride2D.DenseX> bView,
             ArrayView2D<float, Stride2D.DenseX> cView){
-            // var xindex = index.X;
+            ///<summary> Subtracts one ArrayView from another, and puts it in a new ArrayView with dimensions reversed (Used for setting up YDiffBuffer) </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer being subtracted from</param>
+            ///<param name="bView">(ArrayView2D<float, Stride2D.DenseX>) Buffer being subtracted</param>
+            ///<param name="cView">(ArrayView2D<float, Stride2D.DenseX>) Buffer where new value goes</param>
             
-            // for (var i= 0; i< aView.IntExtent.Y; i++){
-                
-            //     cView[new Index2D(i, xindex)] = aView[new Index2D(xindex, i)] - bView[new Index2D(xindex, i)];
-            // }
-            
-            //cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
             cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
             
         }
@@ -346,14 +403,11 @@ namespace ElasticNetRegression
             Index2D index,
             ArrayView2D<float, Stride2D.DenseX> aView,
             ArrayView2D<float, Stride2D.DenseX> bView){
-            // var xindex = index.X;
+            ///<summary> Subtracts one ArrayView from another </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) Buffer being subtracted from</param>
+            ///<param name="bView">(ArrayView2D<float, Stride2D.DenseX>) Buffer being subtracted</param>
             
-            // for (var i= 0; i< aView.IntExtent.Y; i++){
-                
-            //     cView[new Index2D(i, xindex)] = aView[new Index2D(xindex, i)] - bView[new Index2D(xindex, i)];
-            // }
-            
-            //cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
             aView[index] = aView[index] - bView[index];
             
         }
@@ -364,25 +418,14 @@ namespace ElasticNetRegression
             ArrayView2D<float, Stride2D.DenseX> bView,
             ArrayView2D<float, Stride2D.DenseX> cView)
         {
+            ///<summary> Does Matrix Multiplication on two arrayviews, and then stores in a new arrayview </summary>
+            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
+            ///<param name="aView">(ArrayView2D<float, Stride2D.DenseX>) 1st ArrayView being multiplied</param>
+            ///<param name="bView">(ArrayView2D<float, Stride2D.DenseX>) 2nd ArrayView being multiplied</param>
+            ///<param name="cView">(ArrayView2D<float, Stride2D.DenseX>) Buffer where new value goes</param>
             var x = index.X;
             var y = index.Y;
             var sum = 0.0f;
-
-            for (var i = 0; i < aView.IntExtent.Y; i++)
-                sum += aView[new Index2D(x, i)] * bView[new Index2D(i, y)];
-
-            cView[index] = sum;
-        }
-        static void MatMulKernal(
-            Index2D index,
-            ArrayView2D<float, Stride2D.DenseX> aView,
-            ArrayView2D<float, Stride2D.DenseX> bView,
-            ArrayView2D<float, Stride2D.DenseX> cView)
-        {
-            var x = index.X;
-            var y = index.Y;
-            var sum = 0.0f;
-
             for (var i = 0; i < aView.IntExtent.Y; i++)
                 sum += aView[new Index2D(x, i)] * bView[new Index2D(i, y)];
 
@@ -390,7 +433,6 @@ namespace ElasticNetRegression
         }
 
         //Predicts outputs based off of x
-
         float[,] predict(float[,] x)
             ///<summary>Predicts output based off of x</summary>
             ///<param name="x">Array of inputs</param>
@@ -400,17 +442,8 @@ namespace ElasticNetRegression
             this.accelerate.Dispose();
             return prediction;
         }
-        float[,] predictFULLGPU(float[,] x)
-            ///<summary>Predicts output based off of x</summary>
-            ///<param name="x">Array of inputs</param>
-        { 
-            this.accelerate = this.dev.CreateAccelerator(this.context);
 
-            float[,] prediction = applyadd(MatrixMultiplyAccelerated(this.accelerate, x, this.W), this.B);
-            this.accelerate.Dispose();
-            return prediction;
-        }
-
+        //Used in prediction to move the arrays onto the GPU to set up to be multiplied
         static float[,] MatrixMultiplyAccelerated(Accelerator accelerator, float[,] a, float[,] b)
         {
             var m = a.GetLength(0);
@@ -435,10 +468,6 @@ namespace ElasticNetRegression
             bBuffer.CopyFromCPU(b);
 
             kernel(cBuffer.Extent.ToIntIndex(), aBuffer.View, bBuffer.View, cBuffer.View);
-
-            // Reads data from the GPU buffer into a new CPU array.
-            // Implicitly calls accelerator.DefaultStream.Synchronize() to ensure
-            // that the kernel and memory copy are completed first.
             return cBuffer.GetAsArray2D();
         }
         //Adds a value to each member of a 2d array
@@ -456,6 +485,10 @@ namespace ElasticNetRegression
             return temp;
 
         }
+
+        /*
+        Lines 494-709 are all methods used for testing the algo, will be deleted on final version
+        */
         //Helper function used for testing, prints 1d array
         void print1d(float[] array)
         {
