@@ -8,7 +8,9 @@ A [Perceiver AI](https://perceiver.ai/#) project  built by Griffin Perry
 - ILGPU: (https://github.com/m4rs-mt/ILGPU)
 
 # Future Plans
-- Transition to move GPU friendly code
-- Improve runtime by utilizing ILGPU library
+- ~Transition to move GPU friendly code~ **DONE**
+- ~Improve runtime by utilizing ILGPU library~ **DONE**
 - ~Fix bugs when using multiple input/output columns~ **DONE**
-- Have it take in csv/alternate inputs
+- Accept csv/alternate inputs
+- Improve accuracy while maintaining runtime speed
+- Implement early stopping 
