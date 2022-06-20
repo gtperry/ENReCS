@@ -14,3 +14,4 @@ A [Perceiver AI](https://perceiver.ai/#) project  built by Griffin Perry
 - Accept csv/alternate inputs
 - Improve accuracy while maintaining runtime speed
 - Implement early stopping 
+
