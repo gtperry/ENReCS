@@ -116,6 +116,7 @@ namespace ElasticNetRegression
         MemoryBuffer1D<double, Stride1D.Dense> FSumlgBuffer;
         MemoryBuffer1D<double, Stride1D.Dense> FMaxBuffer;
         MemoryBuffer1D<double, Stride1D.Dense> TestBuffer;
+        MemoryBuffer1D<int, Stride1D.Dense> CompPhiBuffer;
 
 
         MemoryBuffer1D<double, Stride1D.Dense> SumBuffer;
@@ -125,6 +126,7 @@ namespace ElasticNetRegression
         MemoryBuffer2D<double, Stride2D.DenseX> dWBuffer;
         MemoryBuffer2D<double, Stride2D.DenseX> YDiffBuffer;
         MemoryBuffer2D<double, Stride2D.DenseX> YPredBuffer;
+
 
 
         public ElasticNet(double learning_rate, int iterations, double l1_penality, double l2_penality, bool fullGPU = false)
@@ -142,6 +144,8 @@ namespace ElasticNetRegression
             this.dev = this.context.GetPreferredDevice(preferCPU: false);
         }
         public double[] colSds(double[,] arr) {
+            Stopwatch stopwtch = new Stopwatch();
+            stopwtch.Start();
             int n = arr.GetLength(1);
             int m = arr.GetLength(0);
             double[] x = new double[n];
@@ -157,12 +161,15 @@ namespace ElasticNetRegression
                 mu /= m;
                 x[j] = Math.Sqrt(sumsq / m - mu * mu);
             }
-
+            stopwtch.Stop();
+            Console.WriteLine(stopwtch.Elapsed);
             return x;
         }
-        public ElasticNet fit(double[,] X, double[] Y, double lambda1, double lambda2, double tol, int maxIter = 1000)
+        public ElasticNet fit(double[,] X, double[] Y, double lambda1, double lambda2, double tol, int maxIter = 1000, bool verbose = true)
         {
             // Console.WriteLine("Here");
+            Stopwatch getasarraytimes = new Stopwatch();
+            Stopwatch timeonfunction = new Stopwatch();
             //double lambda2 = 0.5f;
             this.P = X.GetLength(1);
             int X2length = X.GetLength(0) + this.P;
@@ -174,15 +181,22 @@ namespace ElasticNetRegression
             // Console.WriteLine("COL STD NO GPu");
             // print1d(colSds(X));
             // Console.ReadLine();
+           
             double[] sds = colSds(X); 
-
+            
+            double ymeansum = 0.0;
+            int bval;
             double[] Y2 = new double[Y.GetLength(0) + this.P];
+            
             for (int i = 0; i < Y.GetLength(0); i++)
             {
                 
                 Y2[i] = Y[i];
+                ymeansum += Y[i];
 
             }
+            
+
             
             // Console.ReadLine();
             //this.print1d(Y2);
@@ -200,7 +214,9 @@ namespace ElasticNetRegression
             this.ColMeansBuffer = this.accelerate.Allocate1D<double>((long)X.GetLength(1));
             this.ColSTDBuffer = this.accelerate.Allocate1D<double>((long)X.GetLength(1));
             ColSTDBuffer.CopyFromCPU(sds);
+            
             XBuffer.CopyFromCPU(X);
+            
             this.YBuffer = this.accelerate.Allocate1D<double>(new Index1D(Y2.GetLength(0)));
             this.YNormBuffer = this.accelerate.Allocate1D<double>(new Index1D(Y2.GetLength(0)));
             this.YMeanBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
@@ -278,6 +294,7 @@ namespace ElasticNetRegression
             this.FSumlgBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
             this.FMaxBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
             this.TestBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
+            this.CompPhiBuffer = this.accelerate.Allocate1D<int>(new Index1D(1));
 
 
 
@@ -532,6 +549,71 @@ namespace ElasticNetRegression
                 double>
                 (testKernal);
 
+            var nphicompkern= this.accelerate.LoadAutoGroupedStreamKernel<Index1D , 
+                ArrayView1D<double, Stride1D.Dense> ,
+                ArrayView1D<double, Stride1D.Dense> ,
+                ArrayView1D<double, Stride1D.Dense> ,
+                ArrayView1D<int, Stride1D.Dense> ,
+                double ,
+                double>(nphicompkernal);
+
+            // var lsiterKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
+            //     ArrayView1D<double, Stride1D.Dense> ,
+            //     ArrayView1D<double, Stride1D.Dense> ,
+            //     ArrayView2D<double, Stride2D.DenseX>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView2D<double, Stride2D.DenseX>,
+            //     ArrayView1D<double, Stride1D.Dense> ,
+            //     ArrayView1D<double, Stride1D.Dense> ,
+            //     ArrayView1D<double, Stride1D.Dense> ,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView2D<double, Stride2D.DenseX>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView1D<double, Stride1D.Dense> ,
+            //     int ,
+            //     int ,
+            //     double ,
+            //     double>(lsiterKernal);
+            // var lsiterKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView2D<double, Stride2D.DenseX>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     ArrayView2D<double, Stride2D.DenseX>,
+            //     ArrayView1D<double, Stride1D.Dense>,
+            //     double,
+            //     double,
+            //     int,                
+            //     double,
+            //     double>(lsiterKernal);
+
+            /*lsiterKernal(Index1D ind,
+            ArrayView1D<double, Stride1D.Dense> W,
+            ArrayView1D<double, Stride1D.Dense> U,
+            ArrayView2D<double, Stride2D.DenseX> F,
+            ArrayView1D<double, Stride1D.Dense> NewW,
+            ArrayView1D<double, Stride1D.Dense> NewU,
+            ArrayView2D<double, Stride2D.DenseX> NewF,
+            ArrayView1D<double, Stride1D.Dense> DXU,
+            ArrayView1D<double, Stride1D.Dense> NewZ,
+            ArrayView1D<double, Stride1D.Dense> Y,
+            ArrayView2D<double, Stride2D.DenseX> X,
+            ArrayView1D<double, Stride1D.Dense> phi,
+            ArrayView1D<double, Stride1D.Dense> gdx,
+            int maxiter,
+            int p,
+            double lambda,
+            double alpha,
+            double beta,
+            double t
+            ){*/   
+                    
+            
+
 
             //this.print2d(X);
             // Console.WriteLine(X.GetLength(1));
@@ -550,6 +632,7 @@ namespace ElasticNetRegression
             //     Console.Write(",");
             // }
             
+
             int pitr = 0;
             int n = X.GetLength(0);
             int p = X.GetLength(1);
@@ -582,6 +665,8 @@ namespace ElasticNetRegression
             double bkden = 1.0;
             double bknum = 0.0;
             double bnrm = 0.0;
+
+            double fmax = 0.0;
 
 
             int PCGj = X.GetLength(1) * 2;
@@ -770,10 +855,14 @@ namespace ElasticNetRegression
                     // Console.ReadLine();
 
                     PobjKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.DotProdBufferZxZ.View, this.Norm1Buffer.View, lambda);
+                    getasarraytimes.Start();
                     pobj = this.Norm1Buffer.GetAsArray1D()[0];
+                    getasarraytimes.Stop();
 
                     DobjKern(this.DotProdBufferNUxNU.Extent.ToIntIndex(), this.DotProdBufferNUxNU, this.DotProdBufferNUxY, dobj);
+                    getasarraytimes.Start();
                     dobj = this.DotProdBufferNUxNU.GetAsArray1D()[0];
+                    getasarraytimes.Stop();
 
                     // Console.WriteLine("Pobj");
                     // Console.WriteLine(pobj);
@@ -794,12 +883,15 @@ namespace ElasticNetRegression
 
                     if (niter%10 == 0)
                     {
-                        Console.WriteLine("Primal and dual objective function value after {0} iterations: {1}, {2}", niter, pobj, dobj);
-            
+                        if(verbose){
+                            Console.WriteLine("Primal and dual objective function value after {0} iterations: {1}, {2}", niter, pobj, dobj);
+                        }
                     }
                     if (gap / dobj < tol)
                     {
-                        Console.WriteLine("Primal and dual objective function value after {0} iterations: {1}, {2}", niter, pobj, dobj);
+                        if(verbose){
+                          Console.WriteLine("Primal and dual objective function value after {0} iterations: {1}, {2}", niter, pobj, dobj);
+                        }
                         break;
                     }
                     if (s >= 0.5)
@@ -921,8 +1013,9 @@ namespace ElasticNetRegression
                     //Console.WriteLine("GradNormBuffer");
                     //print1d(GradNormBuffer.GetAsArray1D());
                     // Console.WriteLine();
-
+                    getasarraytimes.Start();
                     pcgtol = Math.Min(0.1, (eta * gap) / Math.Min(1.0, this.GradNormBuffer.GetAsArray1D()[0]));
+                    getasarraytimes.Stop();
                     //pcgtol = 0.1;
                     // Console.WriteLine("PCGTOL");
                     // Console.WriteLine(pcgtol);
@@ -1217,7 +1310,7 @@ namespace ElasticNetRegression
                         // Console.WriteLine();
                         // Console.WriteLine();
                         
-
+                        
                         SubFromRsKern(this.PCGBufferR.Extent.ToIntIndex(), this.PCGBufferR.View, this.PCGBufferRR.View, this.PCGBufferZ.View, this.PCGBufferZZ.View, this.BKNumBuffer.View, this.AKDenBuffer.View, this.DXUBuffer.View, this.PCGBufferP.View);
                         
                         // Console.WriteLine("PCGBufferR");
@@ -1262,8 +1355,9 @@ namespace ElasticNetRegression
 
                         calcErrorKern(this.ErrBuffer.Extent.ToIntIndex(), this.RNormBuffer.View, this.BNormBuffer.View, this.ErrBuffer.View);
 
-
+                        //getasarraytimes.Start();
                         err = this.ErrBuffer.GetAsArray1D()[0];
+                        //getasarraytimes.Stop();
                         // if(Double.IsNaN(err)){
                         //     Console.WriteLine("T");
                         //     Console.WriteLine(t);
@@ -1302,11 +1396,15 @@ namespace ElasticNetRegression
                         // Console.WriteLine();
                         if (iter % 10 == 0)
                         {
-                            Console.WriteLine("BCG: Error after {0} iterations: {1}", iter, err);
+                            if(verbose){
+                                Console.WriteLine("BCG: Error after {0} iterations: {1}", iter, err);
+                            }
                         }
                         if (err <= pcgtol)
                         {
-                            Console.WriteLine("BCG END: Error after {0} iterations: {1}", iter, err);
+                            if(verbose){
+                                Console.WriteLine("BCG END: Error after {0} iterations: {1}", iter, err);
+                            }
                             break;
                         }
                     }
@@ -1390,6 +1488,28 @@ namespace ElasticNetRegression
                     //init s
                     s = 1.0;
                     //init gdx
+                    // /lsiterKern(new Index1D(1),this.WBuffer.View, this.UBuffer.View, this.NewWBuffer.View, this.NewUBuffer.View, this.NewFBuffer.View,  this.DXUBuffer.View, this.YNormBuffer.View, this.X2Buffer.View, this.NewZBuffer.View, this.PhiBuffer.GetAsArray1D()[0], this.DotProdBufferGradxDXU.GetAsArray1D()[0], p, lambda, t);
+                    /*ArrayView1D<double, Stride1D.Dense> W,
+            ArrayView1D<double, Stride1D.Dense> U,
+            ArrayView1D<double, Stride1D.Dense> NewW,
+            ArrayView1D<double, Stride1D.Dense> NewU,
+            ArrayView2D<double, Stride2D.DenseX> NewF,
+            ArrayView1D<double, Stride1D.Dense> DXU,
+            ArrayView1D<double, Stride1D.Dense> Y,
+            ArrayView2D<double, Stride2D.DenseX> X,
+            double phi,
+            double gdx,
+            int maxiter,
+            int p,
+            double lambda,
+            double t
+            ){*/
+
+
+
+                    ///LSITER IF NEED TO UNCOMMENT IT IS HERE:
+
+
 
                     for (int lsiter = 0; lsiter < MAX_LS_ITER; lsiter++)
                     {
@@ -1436,7 +1556,10 @@ namespace ElasticNetRegression
                         // Console.WriteLine("FMaxBuffer");
                         // print1d(FMaxBuffer.GetAsArray1D());
                         // Console.ReadLine();
-                        if (FMaxBuffer.GetAsArray1D()[0] < 0.0)
+                        getasarraytimes.Start();
+                        fmax = FMaxBuffer.GetAsArray1D()[0];
+                        getasarraytimes.Stop();
+                        if (fmax < 0.0)
                         {
                             // Console.WriteLine("MV X2xNEWW -> NewZ");
                             // Console.Write("Indicator:");
@@ -1507,9 +1630,15 @@ namespace ElasticNetRegression
                             // Console.WriteLine(PhiBuffer.GetAsArray1D()[0]);
                             // Console.WriteLine("Vs");
                             // Console.WriteLine(ALPHA * s * DotProdBufferGradxDXU.GetAsArray1D()[0]);
-
-                            if (NewPhiBuffer.GetAsArray1D()[0] - PhiBuffer.GetAsArray1D()[0] <= ALPHA * s * DotProdBufferGradxDXU.GetAsArray1D()[0])
+                            nphicompkern(new Index1D(1), this.PhiBuffer.View, this.NewPhiBuffer.View, this.DotProdBufferGradxDXU.View, this.CompPhiBuffer.View, ALPHA, s);
+                            //getasarraytimes.Start();
+                            // bool nphicomp = NewPhiBuffer.GetAsArray1D()[0] - PhiBuffer.GetAsArray1D()[0] <= ALPHA * s * DotProdBufferGradxDXU.GetAsArray1D()[0];
+                            bval = this.CompPhiBuffer.GetAsArray1D()[0];
+                            //getasarraytimes.Stop();
+                            
+                            if (bval == 1)
                             {
+                                
                                 break;
                             }
                         }
@@ -1517,7 +1646,15 @@ namespace ElasticNetRegression
                         
 
 
+
+
                     }
+
+
+
+                    //FINISH UNCOMMENT ABOVE HERE
+
+
                     // Console.WriteLine("The thing");
                     // Console.Write("Indicator:");
                     // Console.WriteLine(indicator);
@@ -1619,28 +1756,26 @@ namespace ElasticNetRegression
                 
                 // Console.WriteLine("ColMeansBuffer");
                 // print1d(this.ColMeansBuffer.GetAsArray1D());
-                Console.WriteLine("WBuffeR");
-                print1d(this.WBuffer.GetAsArray1D());
+                // Console.WriteLine("WBuffeR");
+                // print1d(this.WBuffer.GetAsArray1D());
                 setBuffToValueKern(this.DotProdBufferWxCenter.Extent.ToIntIndex(), this.DotProdBufferWxCenter.View, 0.0);
                 
                 WFinaleKern(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.ColSTDBuffer.View, c);
                 DotKern(this.DotProdBufferWxCenter.Extent.ToIntIndex(), this.WBuffer.View, this.ColMeansBuffer.View, this.DotProdBufferWxCenter.View, this.WBuffer.Extent.ToIntIndex().X);
 
-                double ymeansum = 0.0;
-                for(int i = 0; i < Y.GetLength(0); i++){
-                    ymeansum += Y[i];
+                
 
-                }
-
-                Console.WriteLine("YMEAN SUM:");
-                Console.WriteLine(ymeansum/Y.GetLength(0));
-                Console.WriteLine("DotProdBufferWxCenter.GetAsArray1D()[0]:");
-                Console.WriteLine(DotProdBufferWxCenter.GetAsArray1D()[0]);
+                // Console.WriteLine("YMEAN SUM:");
+                // Console.WriteLine(ymeansum/Y.GetLength(0));
+                // Console.WriteLine("DotProdBufferWxCenter.GetAsArray1D()[0]:");
+                // Console.WriteLine(DotProdBufferWxCenter.GetAsArray1D()[0]);
+                getasarraytimes.Start();
                 this.B = ymeansum/Y.GetLength(0) - DotProdBufferWxCenter.GetAsArray1D()[0];
-                Console.WriteLine("B");
-                Console.WriteLine(this.B);
-                Console.WriteLine("WBuffeR");
-                print1d(this.WBuffer.GetAsArray1D());
+                getasarraytimes.Stop();
+                // Console.WriteLine("B");
+                // Console.WriteLine(this.B);
+                // Console.WriteLine("WBuffeR");
+                // print1d(this.WBuffer.GetAsArray1D());
                 // Console.WriteLine("this.YMeanBuffer.GetAsArray1D()[0]");
                 // Console.WriteLine(this.YMeanBuffer.GetAsArray1D()[0]);
                 // Console.WriteLine("DotProdBufferWxCenter.GetAsArray1D()[0]");
@@ -1648,11 +1783,120 @@ namespace ElasticNetRegression
 
                 this.W = this.WBuffer.GetAsArray1D();
 
-
+                Console.WriteLine("GET AS ARRAY TIMES");
+                Console.WriteLine(getasarraytimes.Elapsed);
+                Console.WriteLine("timeonfunction");
+                Console.WriteLine(timeonfunction.Elapsed);
             }
             // /Console.ReadLine();
             return this;
 
+
+        }
+        //Attempt to speed up function by moving all of lsiter into one kernal
+        static void lsiterKernal(Index1D ind,
+            ArrayView1D<double, Stride1D.Dense> W,
+            ArrayView1D<double, Stride1D.Dense> U,
+            ArrayView1D<double, Stride1D.Dense> NewW,
+            ArrayView1D<double, Stride1D.Dense> NewU,
+            ArrayView2D<double, Stride2D.DenseX> NewF,
+            ArrayView1D<double, Stride1D.Dense> DXU,
+            ArrayView1D<double, Stride1D.Dense> Y,
+            ArrayView2D<double, Stride2D.DenseX> X,
+            ArrayView1D<double, Stride1D.Dense> NewZ,
+            double phi,
+            double gdx,
+            int p,
+            double lambda,
+            double t
+            ){
+            double s = 1.0;
+            double dotnewz = 0.0;
+            double sumu = 0.0;
+            double sumlgneg = 0.0;
+            double fmax = 0.0;
+            double sum = 0.0;
+            double alpha = 0.01;
+            double beta = 0.5;
+            double maxiter = 10; 
+            //double[] NewZ = new double[Y.Extent.ToIntIndex().X];
+            double newphi = 0.0;
+            Index1D index;
+            for(int i = 0; i < maxiter; i++){
+                for(int j = 0; j < p; j++){
+                    index = new Index1D(j);
+                    NewW[index] = W[index] + s * DXU[index];
+                    NewU[index] = U[index] + s * DXU[new Index1D(j + p)];
+                    NewF[new Index2D(0, j)] = NewW[index] - NewU[index];
+                    NewF[new Index2D(1, j)] = (-1.0 * NewW[index]) - NewU[index];
+                }
+                fmax = NewF[new Index2D(0,0)];
+                for(int j = 0; j < p; j++){
+                    if(NewF[new Index2D(0, j)] > fmax){
+                        fmax = NewF[new Index2D(0, j)];
+                    }
+                    if(NewF[new Index2D(1, j)] > fmax){
+                        fmax = NewF[new Index2D(1, j)];
+                    }
+                }
+                if(fmax < 0.0){
+                    for(int a = 0; a < X.Extent.ToIntIndex().X; a++){
+                        sum = 0.0;
+                        for (int b = 0; b < X.Extent.ToIntIndex().Y; b++){
+                            sum += X[new Index2D(a, b)] * NewW[new Index1D(b)];
+                        }
+
+                        NewZ[new Index1D(a)] = sum;
+                    }
+                    for(int c = 0; c < Y.Extent.ToIntIndex().X; c ++){
+                        index = new Index1D(c);
+                        NewZ[index] = NewZ[index] - Y[index];
+                    }
+                    dotnewz = 0.0;
+                    for (int d = 0; d < NewZ.Extent.ToIntIndex().X; d++)
+                    {
+                        index = new Index1D(d);
+                        dotnewz += NewZ[index] * NewZ[index];
+                    }
+                    sumu = 0.0;
+                    for (int e = 0; e < NewU.Extent.ToIntIndex().X; e++)
+                    {
+                        index = new Index1D(e);
+                        sumu += NewU[index];
+                    }
+                    sumlgneg = 0.0;
+                    for(int j = 0; j < p; j++){
+                        sumlgneg +=Math.Log(-NewF[new Index2D(0, j)]);
+                        sumlgneg +=Math.Log(-NewF[new Index2D(1, j)]);
+                    }
+                    newphi = dotnewz + lambda * sumu - sumlgneg/t;
+
+                    if(newphi - phi<= alpha * s * gdx){
+                        Interop.Write("BREAKING HERE");
+                        break;
+                    }
+
+                }
+                s = beta *s;
+
+            }
+
+        }
+        static void nphicompkernal(Index1D index, 
+            ArrayView1D<double, Stride1D.Dense> phi,
+            ArrayView1D<double, Stride1D.Dense> newphi,
+            ArrayView1D<double, Stride1D.Dense> gradxDxu,
+            ArrayView1D<int, Stride1D.Dense> output,
+            double alpha,
+            double s){
+            if(newphi[index] - phi[index] <= alpha * s * gradxDxu[index]){
+                output[index] = 1;
+
+            }
+            else{
+                output[index] = 0;
+            }
+            //nphicomp = NewPhiBuffer.GetAsArray1D()[0] - PhiBuffer.GetAsArray1D()[0] <= ALPHA * s * DotProdBufferGradxDXU.GetAsArray1D()[0]
 
         }
         static void testKernal(Index1D index,
@@ -1703,6 +1947,7 @@ namespace ElasticNetRegression
             }
 
         }
+        
         static void CalcphiKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> phi,
             ArrayView1D<double, Stride1D.Dense> zdot,
@@ -1740,13 +1985,9 @@ namespace ElasticNetRegression
             for (int i = 0; i < dim1; i++)
             {
                 for (int j = 0; j < dim2; j++)
-                {
-                    if(fView[new Index2D(i, j)] == -1.0){
-                        sumView[index] += 0;
-                    }
-                    else{
-                        sumView[index] +=Math.Log(-fView[new Index2D(i, j)]);
-                    }
+                {     
+                    sumView[index] +=Math.Log(-fView[new Index2D(i, j)]);
+
                 }
             }
 
@@ -3098,6 +3339,8 @@ namespace ElasticNetRegression
             e.writetoCSV(outputs, "TimesOfDataSMENRECS.csv", "Val");
         }
 
+        
+
         static void Main(string[] args)
         {
 
@@ -3110,6 +3353,9 @@ namespace ElasticNetRegression
             ElasticRegression e2 = new ElasticRegression(0.005f, 100, 1.5f, .5f);
             using var streamReader2 = File.OpenText("EnergyData.csv");
             using var csvReader2 = new CsvReader(streamReader2, CultureInfo.CurrentCulture);
+
+            using var streamReader3 = File.OpenText("CASP.csv");
+            using var csvReader3 = new CsvReader(streamReader2, CultureInfo.CurrentCulture);
             
             ;
             
@@ -3148,6 +3394,24 @@ namespace ElasticNetRegression
                 
 
             }
+
+            counter = 0;
+            double[,] caspX = new double[45730,9];
+            double[] caspY = new double[45730];
+            while((line = streamReader3.ReadLine()) != null){
+                row = line.Split(',');
+                if (row[0] != "RMSD"){
+                    
+                    // /Console.WriteLine(row[0]);
+                    caspY[counter] = Double.Parse(row[0]);
+                    for(int i = 1; i < 10; i++){
+                        caspX[counter,i-1] = Double.Parse(row[i]);
+                    }
+                    counter += 1;
+                }
+                
+
+            }
             //e2.print2d(energyx);
 
 
@@ -3170,7 +3434,7 @@ namespace ElasticNetRegression
             //    Console.WriteLine(ColMeansBuffer.Extent.ToIntIndex().X.GetType());
             //Console.ReadLine();
             e1.test(6,4);
-            //    Console.ReadLine();
+            ////    Console.ReadLine();
             // double[,] kernaltesta = new double[10,10];
             // double[,] kernaltestb = new double[10,10];
             // double county = 0.0;
@@ -3243,10 +3507,15 @@ namespace ElasticNetRegression
             // e1.print2d(spyx);
             e1.writetoCSVFullClean(Xactual, Yactual, "Small.csv");
             ElasticNet enet = new ElasticNet(0.005f, 100, 0.05f, 0.05f);
-            enet.fit(energyx, energyy, 3.1, 3.1, 1E-3, 1000);
+            Stopwatch stopwtch = new Stopwatch();
+            stopwtch.Start();
+            enet.fit(caspX, caspY, 4.5, 4.5, 1E-30, 100);
+            //double[,] res2 = e2.predict(Xactual);
+            stopwtch.Stop();
+           
 
 
-            double[] pred =enet.predict(energyx);
+            double[] pred =enet.predict(caspX);
             
             // Console.WriteLine("Finshed Building Data");
             // Console.WriteLine("Ypred");
@@ -3256,15 +3525,16 @@ namespace ElasticNetRegression
             double averr = 0.0;
 
             for(int i = 0; i< pred.GetLength(0); i++){
-               error += Math.Abs(energyy[i] - pred[i]);
+               error += Math.Abs(caspY[i] - pred[i]);
             }
             Console.WriteLine();
             Console.WriteLine("average error");
             Console.WriteLine(error/pred.GetLength(0));
             Console.WriteLine();
 
-            Console.WriteLine("YACTUAL");
+            Console.WriteLine("TIME:");
             //e1.print1d(Yactual);
+            Console.WriteLine(stopwtch.Elapsed);
 
             Console.WriteLine("W");
             
