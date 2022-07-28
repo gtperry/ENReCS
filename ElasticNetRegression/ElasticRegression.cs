@@ -1,3 +1,4 @@
+
 using System;
 using System.IO;
 using System.Threading.Tasks;
@@ -25,19 +26,18 @@ namespace ElasticNetRegression
         Context context;
 
         int Iterations;
-        int M;
+       
         int N;
-        int Q;
+        
         int P;
 
         double Learning_rate;
         double L1_penality;
         double L2_penality;
-        double B;
+        public double B;
 
         public double[] W;
-        double[,] X;
-        double[,] Y;
+        
 
         MemoryBuffer2D<double, Stride2D.DenseX> XBuffer;
         MemoryBuffer2D<double, Stride2D.DenseX> X2Buffer;
@@ -119,13 +119,13 @@ namespace ElasticNetRegression
         MemoryBuffer1D<int, Stride1D.Dense> CompPhiBuffer;
 
 
-        MemoryBuffer1D<double, Stride1D.Dense> SumBuffer;
+       
 
-        MemoryBuffer2D<double, Stride2D.DenseX> MatMulBuffer;
-        MemoryBuffer2D<double, Stride2D.DenseX> PredMatMulBuffer;
-        MemoryBuffer2D<double, Stride2D.DenseX> dWBuffer;
-        MemoryBuffer2D<double, Stride2D.DenseX> YDiffBuffer;
-        MemoryBuffer2D<double, Stride2D.DenseX> YPredBuffer;
+        //MemoryBuffer2D<double, Stride2D.DenseX> MatMulBuffer;
+        //MemoryBuffer2D<double, Stride2D.DenseX> PredMatMulBuffer; 
+        //MemoryBuffer2D<double, Stride2D.DenseX> dWBuffer;
+        
+        
 
 
 
@@ -171,6 +171,7 @@ namespace ElasticNetRegression
             Stopwatch getasarraytimes = new Stopwatch();
             Stopwatch timeonfunction = new Stopwatch();
             //double lambda2 = 0.5f;
+            timeonfunction.Start();
             this.P = X.GetLength(1);
             int X2length = X.GetLength(0) + this.P;
             // Console.WriteLine(X.GetLength(0));
@@ -182,12 +183,12 @@ namespace ElasticNetRegression
             // print1d(colSds(X));
             // Console.ReadLine();
            
-            double[] sds = colSds(X); 
+            //double[] sds = colSds(X); 
             
             double ymeansum = 0.0;
             int bval;
             double[] Y2 = new double[Y.GetLength(0) + this.P];
-            
+            Array.Fill(Y2, 0.0);
             for (int i = 0; i < Y.GetLength(0); i++)
             {
                 
@@ -208,12 +209,13 @@ namespace ElasticNetRegression
             //Default val =  0.2182179,
             double padding = c * Math.Sqrt(lambda2);
             //Number of rows
+            
             this.N = X.GetLength(0);
             this.accelerate = this.dev.CreateAccelerator(this.context);
             this.XBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(X.GetLength(0), X.GetLength(1)));
             this.ColMeansBuffer = this.accelerate.Allocate1D<double>((long)X.GetLength(1));
             this.ColSTDBuffer = this.accelerate.Allocate1D<double>((long)X.GetLength(1));
-            ColSTDBuffer.CopyFromCPU(sds);
+            //ColSTDBuffer.CopyFromCPU(sds);
             
             XBuffer.CopyFromCPU(X);
             
@@ -290,26 +292,42 @@ namespace ElasticNetRegression
             this.PhiBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
             this.NewPhiBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
 
-            this.USumBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
+            this.USumBuffer = this.accelerate.Allocate1D<double>(new Index1D(45));
             this.FSumlgBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
             this.FMaxBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
             this.TestBuffer = this.accelerate.Allocate1D<double>(new Index1D(1));
             this.CompPhiBuffer = this.accelerate.Allocate1D<int>(new Index1D(1));
 
 
-
+            var testDotProdBufferZxZ = this.accelerate.Allocate1D<double>(new Index1D(5));
+            var testDotProdBufferNUxNU = this.accelerate.Allocate1D<double>(new Index1D(5));
+            var testDotProdBufferNUxY = this.accelerate.Allocate1D<double>(new Index1D(5));
+            timeonfunction.Stop();
+            timeonfunction.Reset();
+            timeonfunction.Start();
             var columnMeansKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(
                 columnMeansKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: colmeans");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var columnMeans1DKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(
                 columnMeans1DKernal);
+
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: colmeans1d");
+            // Console.WriteLine(timeonfunction.Elapsed);   
+            // timeonfunction.Reset(); 
+            // timeonfunction.Start();
             var columnSTDevKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
@@ -317,6 +335,13 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(
                 columnSTDevKernal);
+
+            
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: columnstd");
+            // Console.WriteLine(timeonfunction.Elapsed);   
+            // timeonfunction.Reset(); 
+            // timeonfunction.Start();
             var x2fillkern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
@@ -325,6 +350,11 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 double, double, int, int>(
                 fillX2Kernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: x2fill");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var subByColumnsKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -332,81 +362,156 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(
                 subByColumnsKernal);
-
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: subbycolumns");
+            // Console.WriteLine(timeonfunction.Elapsed); 
+            // timeonfunction.Reset();   
+            // timeonfunction.Start();
             var setBuffToValueKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 double>(
                 setBuffToValueKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: setbufftoval");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var FFillKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView2D<double, Stride2D.DenseX>>(
                 FFillKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken:FFILL");
+            // Console.WriteLine(timeonfunction.Elapsed);
+            // timeonfunction.Reset();    
+            // timeonfunction.Start();
             var matrixmulkern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(
                 MatrixMultiplyAcceleratedKernel);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: MATMUL");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var matrixmul2dkern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index2D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView2D<double, Stride2D.DenseX>>(
                 MatrixMultiply2DKernel);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken MATMUL2D");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var matrixmulGradphikern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView2D<double, Stride2D.DenseX>>(
                 MatrixMultiplyGradphiKernel);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken matrixmulGradpHI");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var InitializeNuKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(
                 InitializeNuKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken:InitializeNuKernal");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var GetMaxValKern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(GetMaxValKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: GetMaxVal");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var DualityGapKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double,
                 int>(DualityGapKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken:DualityGap ");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var DotKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>
                 (DotKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: DotKern");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var DotSelfKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>
                 (DotSelfKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: Dotself");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var PobjKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double>(PobjKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: pobj");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var DobjKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double>(DobjKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: dobj");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var NormKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(NormKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: norm");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var Norm2Kern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(Norm2Kernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: norm2");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var NewtonStepKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -415,16 +520,30 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double>(NewtonStepKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken:Newton step");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var GradPhiKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double, double, int>(GradPhiKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: gradphi");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var fillInverseMatrixKern = this.accelerate.LoadAutoGroupedStreamKernel<Index2D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView2D<double, Stride2D.DenseX>>(fillInverseMatrixKernal);
-
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: fill inverse");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var PCGmvKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -433,7 +552,11 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 int
                 >(PCGmvKernal);
-
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: PCGMV");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var PCGasolveKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -442,12 +565,21 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(PCGasolveKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: PCGASOLVE");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var RandRRFillKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(RandRRFillKernal);
-
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time TakenRanRR");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
             var FillPsKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -455,26 +587,52 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(FillPsKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken fill ps");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var FirstIterationFillPsKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(FirstIterationFillPsKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken first iteration fill p");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
+
 
             var BKNUM_AKDENKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(BKNUM_AKDENKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken BKNUM");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var CopyBufferKern2D = this.accelerate.LoadAutoGroupedStreamKernel<Index2D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView2D<double, Stride2D.DenseX>>(CopyBufferKernal2D);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken copybuffer2d");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var CopyBufferKern1D = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(CopyBufferKernal1D);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken copybuffer1d");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var SubFromRsKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -485,6 +643,11 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(SubFromRsKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: subfromrs ");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var PreconditionerVectorKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -492,26 +655,52 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(PreconditionerVectorKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: PreconditionerVectorKern");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
+            
 
             var calcErrorKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(calcErrorKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: calcerror");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var splitDXUKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>, int>(splitDXUKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: splitdxu");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var sumlognegKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int, int>(sumlognegKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: sumlogneg");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var sumofkern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int>(sumofkernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: sumof");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var setnewBuffersKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -521,7 +710,13 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView2D<double, Stride2D.DenseX>,
+                ArrayView1D<double, Stride1D.Dense>,
                 double>(setnewBuffersKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: setnewbuffers");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var CalcphiKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -529,25 +724,42 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double, double>(CalcphiKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: calcphi");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var fmaxKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 int, int>(fmaxKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: FMAXLERn");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var SubYFromZKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(SubYFromZKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: SUBYFROMZ");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
             var WFinaleKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double>(WFinaleKernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: wfinale");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // timeonfunction.Reset();
+            // timeonfunction.Start();
 
-            var testKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
-                ArrayView1D<double, Stride1D.Dense>,
-                double>
-                (testKernal);
+            
 
             var nphicompkern= this.accelerate.LoadAutoGroupedStreamKernel<Index1D , 
                 ArrayView1D<double, Stride1D.Dense> ,
@@ -556,6 +768,53 @@ namespace ElasticNetRegression
                 ArrayView1D<int, Stride1D.Dense> ,
                 double ,
                 double>(nphicompkernal);
+            // timeonfunction.Stop();
+            // Console.WriteLine("Time Taken: nphicomp");
+            // Console.WriteLine(timeonfunction.Elapsed);    
+            // //timeonfunction.Reset();
+            //Console.ReadLine();
+
+            var TripleDotKern= this.accelerate.LoadStreamKernel<
+                ArrayView<double>,
+                ArrayView<double>,
+                ArrayView<double>,
+                ArrayView<double>,
+                ArrayView<double>,
+                ArrayView<double>,
+                ArrayView<double>,
+                int, int >(TripleDotKernal);
+
+            var SingleDotKern= this.accelerate.LoadStreamKernel<
+                ArrayView<double>,
+                ArrayView<double>,
+                ArrayView<double>,
+                int, int >(SingleDotKernal);
+
+            var SingleSelfDotKern= this.accelerate.LoadStreamKernel<
+                ArrayView<double>,
+                
+                ArrayView<double>,
+                int, int >(SingleSelfDotKernal);
+            var sharedMemArrKern = this.accelerate.LoadStreamKernel<
+                    ArrayView<double>, ArrayView<double>>(SharedMemoryArrayKernel);
+
+            var SharedMemoryVariableKern= this.accelerate.LoadStreamKernel<
+                ArrayView<double>,          
+                ArrayView<double>,int,int>(SharedMemoryVariableKerneL); 
+            var SMSumOfKern = this.accelerate.LoadStreamKernel<
+                ArrayView<double>,          
+                ArrayView<double>,int>(SMSumOfKernal); 
+            var SMNormKern = this.accelerate.LoadStreamKernel<
+                ArrayView<double>,          
+                ArrayView<double>,int>(SMNormKernal); 
+            var SMSumLogNegKern= this.accelerate.LoadStreamKernel<
+                ArrayView2D<double, Stride2D.DenseX>,          // A view to a chunk of memory (1D in this case)
+                ArrayView<double>,
+                int>(SMSumLogNegKernal);
+            var sqrtkern= this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
+                    ArrayView1D<double, Stride1D.Dense>>(sqrtkernal);
+            
+            timeonfunction.Stop();
 
             // var lsiterKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
             //     ArrayView1D<double, Stride1D.Dense> ,
@@ -650,8 +909,8 @@ namespace ElasticNetRegression
             double gap;
             double pcgtol;
             double s = 1 / zero;
-            double maxXnu;
-            int indicator = 0;
+           
+            
             // Console.Write("Indicator:");
             // Console.WriteLine(indicator);
             // indicator +=1;
@@ -659,18 +918,50 @@ namespace ElasticNetRegression
 
 
             double err = 0.0;
-            double ak = 1.0;
-            double akden = 1.0;
-            double bk = 1.0;
-            double bkden = 1.0;
-            double bknum = 0.0;
-            double bnrm = 0.0;
+            //double ak = 1.0;
+            //double akden = 1.0;
+            //double bk = 1.0;
+            //double bkden = 1.0;
+            //double bknum = 0.0;
+            //double bnrm = 0.0;
 
             double fmax = 0.0;
+
+            int NgroupSize = Math.Min(this.accelerate.MaxNumThreadsPerGroup, Y2.GetLength(0));
+            int Ngridsize = (int)((Y2.GetLength(0) + NgroupSize - 1) / NgroupSize);
+            int Nremainder =    Y2.GetLength(0) % (int)(Ngridsize * (int)NgroupSize);
+            if (Nremainder == 0){
+                Nremainder = Ngridsize;
+            }
+            int PgroupSize = Math.Min(this.accelerate.MaxNumThreadsPerGroup, X.GetLength(1));
+            int Pgridsize = (int)((X.GetLength(1) + PgroupSize - 1) / PgroupSize);
+            int Premainder =    X.GetLength(1) % (int)(Pgridsize * (int)PgroupSize);
+            if (Premainder == 0){
+                Premainder = Pgridsize;
+            }
+            int P2groupSize = Math.Min(this.accelerate.MaxNumThreadsPerGroup, X.GetLength(1) * 2);
+            int P2gridsize = (int)(((X.GetLength(1) * 2) + PgroupSize - 1) / PgroupSize);
+            int P2remainder =    (X.GetLength(1) * 2) % (int)(Pgridsize * (int)PgroupSize);
+            if (P2remainder == 0){
+                P2remainder = P2gridsize;
+            }
+            KernelConfig Ndimension = (
+                    Ngridsize, // Compute the number of groups (round up)
+                    NgroupSize); 
+            KernelConfig Pdimension = (
+                    Pgridsize, // Compute the number of groups (round up)
+                    PgroupSize); 
+            KernelConfig P2dimension = (
+                    P2gridsize, // Compute the number of groups (round up)
+                    P2groupSize); 
 
 
             int PCGj = X.GetLength(1) * 2;
             int PCGn = X.GetLength(1) * 2;
+            timeonfunction.Stop();
+            Console.WriteLine("Time wasted");
+            Console.WriteLine(timeonfunction.Elapsed);
+            getasarraytimes.Start();
             using (this.ColMeansBuffer)
             using (this.XBuffer)
             {
@@ -681,7 +972,7 @@ namespace ElasticNetRegression
                 // print1d(ColMeansBuffer.GetAsArray1D());
                 // Console.ReadLine();
                 // Console.WriteLine(X.GetLength(1));
-                /// //// / ColumnSTDevKern(this.ColSTDBuffer.Extent.ToIntIndex(), this.XBuffer.View, this.ColSTDBuffer.View, this.ColMeansBuffer.View, X.GetLength(0));
+                columnSTDevKern(this.ColSTDBuffer.Extent.ToIntIndex(), this.XBuffer.View, this.ColSTDBuffer.View, this.ColMeansBuffer.View, X.GetLength(0));
                 
                 // Console.WriteLine("ColSTDBuffer");
                 // this.print1d(ColSTDBuffer.GetAsArray1D());
@@ -722,6 +1013,52 @@ namespace ElasticNetRegression
                 //Done with smile elasticnet
                 //LASSO Algo
                 setBuffToValueKern(this.UBuffer.Extent.ToIntIndex(), this.UBuffer.View, 1.0);
+                //setBuffToValueKern(this.YBuffer.Extent.ToIntIndex(), this.YBuffer.View, 354340.20500000246);
+
+                
+                // var groupSize = Math.Min(this.accelerate.MaxNumThreadsPerGroup, (int)this.YBuffer.View.Length);
+                // int gridsize = (int)(((int)this.YBuffer.View.Length + groupSize - 1) / groupSize);
+                // int remainder =    (int)this.YBuffer.View.Length % (int)(gridsize * (int)groupSize);
+
+
+
+                // // this.accelerate.DefaultStream.Synchronize();
+                // // timeonfunction.Reset();
+               
+                // // Console.WriteLine(((int)this.YBuffer.View.Length + groupSize - 1) / groupSize);
+                // // Console.WriteLine(groupSize);
+                // // Console.WriteLine(this.YBuffer.View.Length);
+                // // Console.WriteLine(remainder);
+                // // Console.WriteLine(gridsize);
+                // // Console.WriteLine(groupSize-remainder);
+                // KernelConfig dimension = (
+                //     gridsize, // Compute the number of groups (round up)
+                //     groupSize);  
+
+                // SharedMemoryVariableKern(dimension, this.YBuffer.View, testDotProdBufferZxZ.View, groupSize, remainder);
+                
+                // this.accelerate.DefaultStream.Synchronize();
+                // // timeonfunction.Start();
+                // // SharedMemoryVariableKern(dimension, this.YBuffer.View, this.USumBuffer.View, gridsize, remainder);
+                // // timeonfunction.Stop();
+                // Console.WriteLine(timeonfunction.Elapsed);
+                // Console.WriteLine("USUMBUFFER");
+                // print1d(testDotProdBufferZxZ.GetAsArray1D());
+                // Console.WriteLine(groupSize);
+                // Console.WriteLine(YBuffer.Extent.ToIntIndex());
+                // Console.WriteLine("YBuffer");
+                // //print1d(YBuffer.GetAsArray1D());
+                // Console.ReadLine();
+                // timeonfunction.Reset();
+                // timeonfunction.Start();
+                // setBuffToValueKern(this.USumBuffer.Extent.ToIntIndex(), this.USumBuffer.View, 0.0);
+
+                // sumofkern(this.USumBuffer.Extent.ToIntIndex(), this.YBuffer.View, this.USumBuffer.View, this.YBuffer.Extent.ToIntIndex().X);
+                // // timeonfunction.Stop();
+                // Console.WriteLine("USUMBUFFER");
+                // print1d(USumBuffer.GetAsArray1D());
+                // Console.WriteLine(timeonfunction.Elapsed);
+                // Console.ReadLine();
 
                 
                 // print1d(UBuffer.GetAsArray1D());
@@ -830,11 +1167,39 @@ namespace ElasticNetRegression
                     setBuffToValueKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.DotProdBufferZxZ.View, 0.0);
                     setBuffToValueKern(this.DotProdBufferNUxNU.Extent.ToIntIndex(), this.DotProdBufferNUxNU.View, 0.0);
                     setBuffToValueKern(this.DotProdBufferNUxY.Extent.ToIntIndex(), this.DotProdBufferNUxY.View, 0.0);
-                    setBuffToValueKern(this.Norm1Buffer.Extent.ToIntIndex(), this.Norm1Buffer.View, 0.0);
+                    // setBuffToValueKern(testDotProdBufferZxZ.Extent.ToIntIndex(), testDotProdBufferZxZ.View, 0.0);
+                    // setBuffToValueKern(testDotProdBufferNUxNU.Extent.ToIntIndex(), testDotProdBufferNUxNU.View, 0.0);
+                    // setBuffToValueKern(testDotProdBufferNUxY.Extent.ToIntIndex(), testDotProdBufferNUxY.View, 0.0);
 
-                    DotSelfKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.ZBuffer.View, this.DotProdBufferZxZ.View, this.ZBuffer.Extent.ToIntIndex().X);
-                    DotSelfKern(this.DotProdBufferNUxNU.Extent.ToIntIndex(), this.NuBuffer.View, this.DotProdBufferNUxNU.View, this.NuBuffer.Extent.ToIntIndex().X);
-                    DotKern(this.DotProdBufferNUxY.Extent.ToIntIndex(), this.NuBuffer.View, this.YNormBuffer.View, this.DotProdBufferNUxY.View, this.NuBuffer.Extent.ToIntIndex().X);
+                    
+
+                    //setBuffToValueKern(this.ZBuffer.Extent.ToIntIndex(), this.ZBuffer.View, 1.1);
+                    //setBuffToValueKern(this.DotProdBufferNUxNU.Extent.ToIntIndex(), this.DotProdBufferNUxNU.View, 0.0);
+                    //setBuffToValueKern(this.DotProdBufferNUxY.Extent.ToIntIndex(), this.DotProdBufferNUxY.View, 0.0);
+
+                    // DotSelfKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.ZBuffer.View, this.DotProdBufferZxZ.View, this.ZBuffer.Extent.ToIntIndex().X);
+                    // DotSelfKern(this.DotProdBufferNUxNU.Extent.ToIntIndex(), this.NuBuffer.View, this.DotProdBufferNUxNU.View, this.NuBuffer.Extent.ToIntIndex().X);
+                    //DotKern(this.DotProdBufferNUxY.Extent.ToIntIndex(), this.NuBuffer.View, this.YNormBuffer.View, this.DotProdBufferNUxY.View, this.NuBuffer.Extent.ToIntIndex().X);
+                    TripleDotKern(Ndimension, this.NuBuffer.View, this.YNormBuffer.View, this.DotProdBufferNUxY.View, this.NuBuffer.View, this.DotProdBufferNUxNU.View,this.ZBuffer.View, this.DotProdBufferZxZ.View,NgroupSize, Nremainder);
+                    // Console.WriteLine("Grid, group, dimension");
+                    // Console.WriteLine(Ngridsize);
+                    // Console.WriteLine(NgroupSize);
+                    // Console.WriteLine(Nremainder);
+                    // Console.WriteLine("Comparison of the two");
+                    // Console.WriteLine("Norm Dot ZxZ");
+                    // print1d(this.DotProdBufferZxZ.GetAsArray1D());
+                    // Console.WriteLine("Test Dot ZxZ");
+                    // print1d(testDotProdBufferZxZ.GetAsArray1D());
+                    // Console.WriteLine("Norm Dot NUxNU");
+                    // print1d(this.DotProdBufferNUxNU.GetAsArray1D());
+                    // Console.WriteLine("Test Dot NUxNU");
+                    // print1d(testDotProdBufferNUxNU.GetAsArray1D());
+                    // Console.WriteLine("Norm Dot NUxY");
+                    // print1d(this.DotProdBufferNUxY.GetAsArray1D());
+                    // Console.WriteLine("Test Dot NUxY");
+                    // print1d(testDotProdBufferNUxY.GetAsArray1D());
+                    // Console.ReadLine();
+
 
                     // Console.WriteLine("----");
                     // Console.WriteLine("ZxZBuffer");
@@ -844,9 +1209,9 @@ namespace ElasticNetRegression
                     // Console.WriteLine("NuxYBuffer");
                     // print1d(DotProdBufferNUxY.GetAsArray1D());
                     // Console.ReadLine();
-
-                    NormKern(this.Norm1Buffer.Extent.ToIntIndex(), this.WBuffer.View, this.Norm1Buffer.View, this.WBuffer.Extent.ToIntIndex().X);
-
+                    setBuffToValueKern(this.Norm1Buffer.Extent.ToIntIndex(), this.Norm1Buffer.View, 0.0);
+                    //NormKern(this.Norm1Buffer.Extent.ToIntIndex(), this.WBuffer.View, this.Norm1Buffer.View, this.WBuffer.Extent.ToIntIndex().X);
+                    SMNormKern(Pdimension, this.WBuffer.View, this.Norm1Buffer.View, PgroupSize);
                     // Console.WriteLine("WBuffer");
                     // print1d(WBuffer.GetAsArray1D());
                     // Console.WriteLine("Norm1Buffer");
@@ -855,14 +1220,14 @@ namespace ElasticNetRegression
                     // Console.ReadLine();
 
                     PobjKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.DotProdBufferZxZ.View, this.Norm1Buffer.View, lambda);
-                    getasarraytimes.Start();
+                    //getasarraytimes.Start();
                     pobj = this.Norm1Buffer.GetAsArray1D()[0];
-                    getasarraytimes.Stop();
+                    //getasarraytimes.Stop();
 
                     DobjKern(this.DotProdBufferNUxNU.Extent.ToIntIndex(), this.DotProdBufferNUxNU, this.DotProdBufferNUxY, dobj);
-                    getasarraytimes.Start();
+                    //getasarraytimes.Start();
                     dobj = this.DotProdBufferNUxNU.GetAsArray1D()[0];
-                    getasarraytimes.Stop();
+                    //getasarraytimes.Stop();
 
                     // Console.WriteLine("Pobj");
                     // Console.WriteLine(pobj);
@@ -965,7 +1330,7 @@ namespace ElasticNetRegression
                     // Console.Write("Indicator:");
                     // Console.WriteLine(indicator);
                     // indicator +=1;
-
+                    // GradPhiAndPreconditionerKern
                     GradPhiKern(this.Q1Buffer.Extent.ToIntIndex(), this.GradphiBuffer.View, this.Q1Buffer.View, this.Q2Buffer.View, this.GradBuffer.View, t, lambda, p);
 
                     // if(Double.IsNaN(this.GradphiBuffer.GetAsArray2D()[0,0])){
@@ -1005,17 +1370,18 @@ namespace ElasticNetRegression
 
                     setBuffToValueKern(this.GradNormBuffer.Extent.ToIntIndex(), this.GradNormBuffer.View, 0.0);
 
-                    Norm2Kern(this.GradNormBuffer.Extent.ToIntIndex(), this.GradBuffer.View, this.GradNormBuffer.View, this.GradBuffer.Extent.ToIntIndex().X);
-
+                    //Norm2Kern(this.GradNormBuffer.Extent.ToIntIndex(), this.GradBuffer.View, this.GradNormBuffer.View, this.GradBuffer.Extent.ToIntIndex().X);
+                    SingleSelfDotKern(P2dimension, this.GradBuffer.View, this.GradNormBuffer.View, P2groupSize, P2remainder);
+                    sqrtkern(this.GradNormBuffer.Extent.ToIntIndex(), this.GradNormBuffer.View);
                     // Console.WriteLine("GradNormBuffer********");
                     // Console.WriteLine(this.GradNormBuffer.GetAsArray1D()[0]);
                     // Console.WriteLine();
                     //Console.WriteLine("GradNormBuffer");
                     //print1d(GradNormBuffer.GetAsArray1D());
                     // Console.WriteLine();
-                    getasarraytimes.Start();
+                    //getasarraytimes.Start();
                     pcgtol = Math.Min(0.1, (eta * gap) / Math.Min(1.0, this.GradNormBuffer.GetAsArray1D()[0]));
-                    getasarraytimes.Stop();
+                    //getasarraytimes.Stop();
                     //pcgtol = 0.1;
                     // Console.WriteLine("PCGTOL");
                     // Console.WriteLine(pcgtol);
@@ -1053,17 +1419,17 @@ namespace ElasticNetRegression
                     // Console.WriteLine("Beginning of PCG Solve");
                     // Console.WriteLine();
 
-                    setBuffToValueKern(this.ErrBuffer.Extent.ToIntIndex(), this.ErrBuffer.View, 0.0);
-                    setBuffToValueKern(this.PCGBufferR.Extent.ToIntIndex(), this.PCGBufferR.View, 0.0);
-                    setBuffToValueKern(this.PCGBufferRR.Extent.ToIntIndex(), this.PCGBufferRR.View, 0.0);
-                    setBuffToValueKern(this.PCGBufferP.Extent.ToIntIndex(), this.PCGBufferP.View, 0.0);
-                    setBuffToValueKern(this.PCGBufferPP.Extent.ToIntIndex(), this.PCGBufferPP.View, 0.0);
-                    setBuffToValueKern(this.PCGBufferZ.Extent.ToIntIndex(), this.PCGBufferZ.View, 0.0);
-                    setBuffToValueKern(this.PCGBufferZZ.Extent.ToIntIndex(), this.PCGBufferZZ.View, 0.0);
-                    setBuffToValueKern(this.BNormBuffer.Extent.ToIntIndex(), this.BNormBuffer.View, 0.0);
-                    setBuffToValueKern(this.BKNumBuffer.Extent.ToIntIndex(), this.BNormBuffer.View, 0.0);
-                    setBuffToValueKern(this.BKDenBuffer.Extent.ToIntIndex(), this.BKDenBuffer.View, 1.0);
-                    setBuffToValueKern(this.AKDenBuffer.Extent.ToIntIndex(), this.AKDenBuffer.View, 1.0);
+                    // setBuffToValueKern(this.ErrBuffer.Extent.ToIntIndex(), this.ErrBuffer.View, 0.0);
+                    // setBuffToValueKern(this.PCGBufferR.Extent.ToIntIndex(), this.PCGBufferR.View, 0.0);
+                    // setBuffToValueKern(this.PCGBufferRR.Extent.ToIntIndex(), this.PCGBufferRR.View, 0.0);
+                    // setBuffToValueKern(this.PCGBufferP.Extent.ToIntIndex(), this.PCGBufferP.View, 0.0);
+                    // setBuffToValueKern(this.PCGBufferPP.Extent.ToIntIndex(), this.PCGBufferPP.View, 0.0);
+                    // setBuffToValueKern(this.PCGBufferZ.Extent.ToIntIndex(), this.PCGBufferZ.View, 0.0);
+                    // setBuffToValueKern(this.PCGBufferZZ.Extent.ToIntIndex(), this.PCGBufferZZ.View, 0.0);
+                    // setBuffToValueKern(this.BNormBuffer.Extent.ToIntIndex(), this.BNormBuffer.View, 0.0);
+                    // setBuffToValueKern(this.BKNumBuffer.Extent.ToIntIndex(), this.BNormBuffer.View, 0.0);
+                    // setBuffToValueKern(this.BKDenBuffer.Extent.ToIntIndex(), this.BKDenBuffer.View, 1.0);
+                    // setBuffToValueKern(this.AKDenBuffer.Extent.ToIntIndex(), this.AKDenBuffer.View, 1.0);
 
 
 
@@ -1109,7 +1475,10 @@ namespace ElasticNetRegression
 
 
                     setBuffToValueKern(this.BNormBuffer.Extent.ToIntIndex(), this.BNormBuffer.View, 0.0);
-                    Norm2Kern(this.BNormBuffer.Extent.ToIntIndex(), this.GradBuffer.View, this.BNormBuffer.View, this.GradBuffer.Extent.ToIntIndex().X);
+                    //Norm2Kern(this.BNormBuffer.Extent.ToIntIndex(), this.GradBuffer.View, this.BNormBuffer.View, this.GradBuffer.Extent.ToIntIndex().X);
+                    SingleSelfDotKern(P2dimension, this.GradBuffer.View, this.BNormBuffer.View, P2groupSize, P2remainder);
+                    sqrtkern(this.BNormBuffer.Extent.ToIntIndex(), this.BNormBuffer.View);
+
 
                     // Console.WriteLine("BNormBuffer");
                     // print1d(BNormBuffer.GetAsArray1D());
@@ -1138,7 +1507,7 @@ namespace ElasticNetRegression
                     // Console.WriteLine();
                     // Console.WriteLine("BEGIN PCG LOOP");
                     // Console.ReadLine();
-
+                    
 
                     for (int iter = 1; iter < pcgmaxi; iter++)
                     {
@@ -1161,7 +1530,8 @@ namespace ElasticNetRegression
                         
                         // Console.WriteLine("bknum gen");
 
-                        BKNUM_AKDENKern(this.BKNumBuffer.Extent.ToIntIndex(), this.BKNumBuffer.View, this.PCGBufferRR.View, this.PCGBufferZ.View, this.PCGBufferZ.Extent.ToIntIndex().X);
+                        //BKNUM_AKDENKern(this.BKNumBuffer.Extent.ToIntIndex(), this.BKNumBuffer.View, this.PCGBufferRR.View, this.PCGBufferZ.View, this.PCGBufferZ.Extent.ToIntIndex().X);
+                        SingleDotKern(P2dimension, this.PCGBufferRR.View, this.PCGBufferZ.View, this.BKNumBuffer.View,P2groupSize, P2remainder);
 
                         // Console.WriteLine("PCGRBufferRR");
                         // print1d(PCGBufferRR.GetAsArray1D());
@@ -1255,8 +1625,8 @@ namespace ElasticNetRegression
                         // Console.WriteLine("AKDEN");
 
                         setBuffToValueKern(this.AKDenBuffer.Extent.ToIntIndex(), this.AKDenBuffer.View, 0.0);
-                        BKNUM_AKDENKern(this.AKDenBuffer.Extent.ToIntIndex(), this.AKDenBuffer.View, this.PCGBufferPP.View, this.PCGBufferZ.View, this.PCGBufferZ.Extent.ToIntIndex().X);
-
+                        //BKNUM_AKDENKern(this.AKDenBuffer.Extent.ToIntIndex(), this.AKDenBuffer.View, this.PCGBufferPP.View, this.PCGBufferZ.View, this.PCGBufferZ.Extent.ToIntIndex().X);
+                        SingleDotKern(P2dimension, this.PCGBufferPP.View, this.PCGBufferZ.View, this.AKDenBuffer.View,P2groupSize, P2remainder);
                         // Console.WriteLine("AKDenBuffer");
                         // print1d(AKDenBuffer.GetAsArray1D());
                         // Console.WriteLine("PCGBufferZ");
@@ -1339,8 +1709,9 @@ namespace ElasticNetRegression
                         // print1d(PCGBufferR.GetAsArray1D());
 
                         setBuffToValueKern(this.RNormBuffer.Extent.ToIntIndex(), this.RNormBuffer.View, 0.0);
-                        Norm2Kern(this.RNormBuffer.Extent.ToIntIndex(), this.PCGBufferR.View, this.RNormBuffer.View, this.PCGBufferR.Extent.ToIntIndex().X);
-
+                        //Norm2Kern(this.RNormBuffer.Extent.ToIntIndex(), this.PCGBufferR.View, this.RNormBuffer.View, this.PCGBufferR.Extent.ToIntIndex().X);
+                        SingleSelfDotKern(P2dimension, this.PCGBufferR.View, this.RNormBuffer.View, P2groupSize, P2remainder);
+                        sqrtkern(this.RNormBuffer.Extent.ToIntIndex(), this.RNormBuffer.View);
                         
                         // Console.WriteLine("RNormBuffer");
                         // print1d(RNormBuffer.GetAsArray1D());
@@ -1420,6 +1791,7 @@ namespace ElasticNetRegression
                     // indicator +=1;
                     // Console.WriteLine("DXUBUFFER");
                     //print1d(DXUBuffer.GetAsArray1D());
+                    //this.accelerate.DefaultStream.Synchronize();
                     
                     splitDXUKern(this.DXBuffer.Extent.ToIntIndex(), this.DXBuffer.View, this.DUBuffer.View, this.DXUBuffer.View, this.DXBuffer.Extent.ToIntIndex().X);
 
@@ -1436,7 +1808,8 @@ namespace ElasticNetRegression
                     //init phi
                     setBuffToValueKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.DotProdBufferZxZ.View, 0.0);
                     
-                    DotSelfKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.ZBuffer.View, this.DotProdBufferZxZ.View, this.ZBuffer.Extent.ToIntIndex().X);
+                    //DotSelfKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.ZBuffer.View, this.DotProdBufferZxZ.View, this.ZBuffer.Extent.ToIntIndex().X);
+                    SingleSelfDotKern(Ndimension, this.ZBuffer.View, this.DotProdBufferZxZ.View,NgroupSize, Nremainder);
 
                     // Console.WriteLine("DotProdBufferZxZ");
                     // print1d(DotProdBufferZxZ.GetAsArray1D());
@@ -1446,8 +1819,8 @@ namespace ElasticNetRegression
                     // print1d(UBuffer.GetAsArray1D());
 
                     setBuffToValueKern(this.USumBuffer.Extent.ToIntIndex(), this.USumBuffer.View, 0.0);
-                    sumofkern(this.USumBuffer.Extent.ToIntIndex(), this.UBuffer.View, this.USumBuffer.View, this.UBuffer.Extent.ToIntIndex().X);
-
+                    //sumofkern(this.USumBuffer.Extent.ToIntIndex(), this.UBuffer.View, this.USumBuffer.View, this.UBuffer.Extent.ToIntIndex().X);
+                    SMSumOfKern(Pdimension, this.UBuffer.View, this.USumBuffer.View, PgroupSize);
                     // Console.WriteLine("USumBuffer");
                     // print1d(USumBuffer.GetAsArray1D());
                     // Console.ReadLine();
@@ -1456,10 +1829,13 @@ namespace ElasticNetRegression
                     // print2d(FBuffer.GetAsArray2D());
 
                     setBuffToValueKern(this.FSumlgBuffer.Extent.ToIntIndex(), this.FSumlgBuffer.View, 0.0);
-                    sumlognegKern(this.FSumlgBuffer.Extent.ToIntIndex(), this.FBuffer.View, this.FSumlgBuffer.View, this.FBuffer.Extent.ToIntIndex().X, this.FBuffer.Extent.ToIntIndex().Y);
-
-                    // Console.WriteLine("FSumlgBuffer");
+                    //setBuffToValueKern(testDotProdBufferZxZ.Extent.ToIntIndex(), testDotProdBufferZxZ.View, 0.0);
+                    //sumlognegKern(this.FSumlgBuffer.Extent.ToIntIndex(), this.FBuffer.View, this.FSumlgBuffer.View, this.FBuffer.Extent.ToIntIndex().X, this.FBuffer.Extent.ToIntIndex().Y);
+                    SMSumLogNegKern(Pdimension,  this.FBuffer.View, this.FSumlgBuffer.View, PgroupSize);
+                    //Console.WriteLine("FSumlgBuffer");
                     // print1d(FSumlgBuffer.GetAsArray1D());
+                    // Console.WriteLine("testDotProdBufferZxZ");
+                    // print1d(testDotProdBufferZxZ.GetAsArray1D());
                     // Console.ReadLine();
                     
                     // Console.WriteLine("CALC PHI BUFFER");
@@ -1468,7 +1844,7 @@ namespace ElasticNetRegression
 
                     // Console.WriteLine("PhiBuffer");
                     // print1d(PhiBuffer.GetAsArray1D());
-                    // Console.ReadLine();
+                    // Console.ReadLine(); 
 
                     // Console.WriteLine("GradBuffer");
                     // print1d(GradBuffer.GetAsArray1D());
@@ -1476,7 +1852,8 @@ namespace ElasticNetRegression
                     // print1d(DXUBuffer.GetAsArray1D());
 
                     setBuffToValueKern(this.DotProdBufferGradxDXU.Extent.ToIntIndex(), this.DotProdBufferGradxDXU.View, 0.0);
-                    DotKern(this.DotProdBufferGradxDXU.Extent.ToIntIndex(), this.GradBuffer.View, this.DXUBuffer.View, this.DotProdBufferGradxDXU.View, this.GradBuffer.Extent.ToIntIndex().X);
+                    //DotKern(this.DotProdBufferGradxDXU.Extent.ToIntIndex(), this.GradBuffer.View, this.DXUBuffer.View, this.DotProdBufferGradxDXU.View, this.GradBuffer.Extent.ToIntIndex().X);
+                    SingleDotKern(P2dimension, this.GradBuffer.View, this.DXUBuffer.View, this.DotProdBufferGradxDXU.View,P2groupSize, P2remainder);
 
 
                     // Console.WriteLine("DotProdBufferGradxDXU");
@@ -1510,7 +1887,7 @@ namespace ElasticNetRegression
                     ///LSITER IF NEED TO UNCOMMENT IT IS HERE:
 
 
-
+                    
                     for (int lsiter = 0; lsiter < MAX_LS_ITER; lsiter++)
                     {
                         //set new buffers
@@ -1540,7 +1917,8 @@ namespace ElasticNetRegression
                         // Console.Write("Indicator:");
                         // Console.WriteLine(indicator);
                         // indicator +=1;
-                        setnewBuffersKern(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.UBuffer.View, this.DXBuffer.View, this.DUBuffer.View, this.NewWBuffer.View, this.NewUBuffer.View, this.NewFBuffer.View, s);
+                        setBuffToValueKern(this.FMaxBuffer.Extent.ToIntIndex(), this.FMaxBuffer.View, -1.0);
+                        setnewBuffersKern(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.UBuffer.View, this.DXBuffer.View, this.DUBuffer.View, this.NewWBuffer.View, this.NewUBuffer.View, this.NewFBuffer.View, this.FMaxBuffer.View, s);
 
                         // Console.WriteLine("NewWBuffer");
                         // print1d(NewWBuffer.GetAsArray1D());
@@ -1551,14 +1929,14 @@ namespace ElasticNetRegression
                         // Console.ReadLine();
                         //get max of f
 
-                        fmaxKern(this.FMaxBuffer.Extent.ToIntIndex(), this.NewFBuffer.View, this.FMaxBuffer.View, this.NewFBuffer.Extent.ToIntIndex().X, this.NewFBuffer.Extent.ToIntIndex().Y);
+                        //fmaxKern(this.FMaxBuffer.Extent.ToIntIndex(), this.NewFBuffer.View, this.FMaxBuffer.View, this.NewFBuffer.Extent.ToIntIndex().X, this.NewFBuffer.Extent.ToIntIndex().Y);
 
                         // Console.WriteLine("FMaxBuffer");
                         // print1d(FMaxBuffer.GetAsArray1D());
                         // Console.ReadLine();
-                        getasarraytimes.Start();
+                        //getasarraytimes.Start();
                         fmax = FMaxBuffer.GetAsArray1D()[0];
-                        getasarraytimes.Stop();
+                        //getasarraytimes.Stop();
                         if (fmax < 0.0)
                         {
                             // Console.WriteLine("MV X2xNEWW -> NewZ");
@@ -1594,10 +1972,14 @@ namespace ElasticNetRegression
                             // print1d(NewZBuffer.GetAsArray1D());
                             
                             setBuffToValueKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.DotProdBufferZxZ.View, 0.0);
-                            DotSelfKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.NewZBuffer.View, this.DotProdBufferZxZ.View, this.NewZBuffer.Extent.ToIntIndex().X);
-
+                            //setBuffToValueKern(this.NewZBuffer.Extent.ToIntIndex(), this.NewZBuffer.View, 4120.123456789);
+                            //DotSelfKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.NewZBuffer.View, this.DotProdBufferZxZ.View, this.NewZBuffer.Extent.ToIntIndex().X);
+                            SingleSelfDotKern(Ndimension, this.NewZBuffer.View, this.DotProdBufferZxZ.View,NgroupSize, Nremainder);
+                            // Console.WriteLine(Nremainder);
                             // Console.WriteLine("DotProdBufferZxZ");
                             // print1d(DotProdBufferZxZ.GetAsArray1D());
+                            // Console.WriteLine("TestDotProdBufferZxZ");
+                            // print1d(testDotProdBufferZxZ.GetAsArray1D());
                             // Console.ReadLine();
 
                             // Console.WriteLine("USUM");
@@ -1605,8 +1987,8 @@ namespace ElasticNetRegression
                             // print1d(NewUBuffer.GetAsArray1D());
 
                             setBuffToValueKern(this.USumBuffer.Extent.ToIntIndex(), this.USumBuffer.View, 0.0);
-                            sumofkern(this.USumBuffer.Extent.ToIntIndex(), this.NewUBuffer.View, this.USumBuffer.View, this.UBuffer.Extent.ToIntIndex().X);
-
+                            //sumofkern(this.USumBuffer.Extent.ToIntIndex(), this.NewUBuffer.View, this.USumBuffer.View, this.UBuffer.Extent.ToIntIndex().X);
+                            SMSumOfKern(Pdimension, this.NewUBuffer.View, this.USumBuffer.View, PgroupSize);
                             // Console.WriteLine("USumBuffer");
                             // print1d(USumBuffer.GetAsArray1D());
                             // Console.ReadLine();
@@ -1616,8 +1998,8 @@ namespace ElasticNetRegression
                             // print2d(NewFBuffer.GetAsArray2D());
 
                             setBuffToValueKern(this.FSumlgBuffer.Extent.ToIntIndex(), this.FSumlgBuffer.View, 0.0);
-                            sumlognegKern(this.FSumlgBuffer.Extent.ToIntIndex(), this.NewFBuffer.View, this.FSumlgBuffer.View, this.NewFBuffer.Extent.ToIntIndex().X, this.NewFBuffer.Extent.ToIntIndex().Y);
-
+                            //sumlognegKern(this.FSumlgBuffer.Extent.ToIntIndex(), this.NewFBuffer.View, this.FSumlgBuffer.View, this.NewFBuffer.Extent.ToIntIndex().X, this.NewFBuffer.Extent.ToIntIndex().Y);
+                            SMSumLogNegKern(Pdimension,  this.NewFBuffer.View, this.FSumlgBuffer.View, PgroupSize);
                             // Console.WriteLine("FSumlgBuffer");
                             // print1d(FSumlgBuffer.GetAsArray1D());
                             // Console.ReadLine();
@@ -1633,10 +2015,10 @@ namespace ElasticNetRegression
                             nphicompkern(new Index1D(1), this.PhiBuffer.View, this.NewPhiBuffer.View, this.DotProdBufferGradxDXU.View, this.CompPhiBuffer.View, ALPHA, s);
                             //getasarraytimes.Start();
                             // bool nphicomp = NewPhiBuffer.GetAsArray1D()[0] - PhiBuffer.GetAsArray1D()[0] <= ALPHA * s * DotProdBufferGradxDXU.GetAsArray1D()[0];
-                            bval = this.CompPhiBuffer.GetAsArray1D()[0];
+                            
                             //getasarraytimes.Stop();
                             
-                            if (bval == 1)
+                            if (this.CompPhiBuffer.GetAsArray1D()[0] == 1)
                             {
                                 
                                 break;
@@ -1649,7 +2031,12 @@ namespace ElasticNetRegression
 
 
                     }
+                    //this.accelerate.DefaultStream.Synchronize();
+                    
+                    // Console.WriteLine("LSITERATIONS");
+                    // Console.WriteLine(lsiter);
 
+ 
 
 
                     //FINISH UNCOMMENT ABOVE HERE
@@ -1664,134 +2051,424 @@ namespace ElasticNetRegression
                     CopyBufferKern1D(this.NewUBuffer.Extent.ToIntIndex(), this.NewUBuffer.View, this.UBuffer.View);
                     CopyBufferKern2D(this.NewFBuffer.Extent.ToIntIndex(), this.NewFBuffer.View, this.FBuffer.View);
 
-                    // Console.WriteLine("NewWBuffeR");
-                    // print1d(this.NewWBuffer.GetAsArray1D());
-                    // Console.WriteLine("WBuffeR");
-                    // print1d(this.WBuffer.GetAsArray1D());
-                    // Console.WriteLine("NewUBuffer");
-                    // print1d(this.NewUBuffer.GetAsArray1D());
-                    // Console.WriteLine("UBuffer");
-                    // print1d(this.UBuffer.GetAsArray1D());
-                    // Console.ReadLine();
-
-                    // Console.WriteLine("--------------------------------");
-
-                    //b = gradbuffer
-                    //x = dxu
-                    //A = X2
-                    //d1 = d1
-                    //d2 = d2
-                    //prb = prb
-                    //prs = prs
-                    //PCG SOLVE!!!!!
-                    //Need gradbuffer, dxu buffer, pcgtol, 1, pcgmaxi
-                    //Need to make PCG asolve
-                    //Need to make IMatrix solve  
-                    //Need to write norm
-                    //need to write ata
-                    //Need to get inverse of a matrix
-
-                    //Following functions are overridden:
-                    //nrow
-                    //ncol
-                    //mv
-                    //tv
-                    //asolve
-
+                   
 
 
                 }
-                //return w
-
-
-                //Initialize w,u,z,f
-                //Z is the array that the matrix mul goes into
-                //*NOTE: these are all one dimensional in smile, however may need adjusting for multi-output
-
-                //Fill f
-
-                //Initialize a bunch of Arrays
-
-                //Begin main loop
-                //matrix mul, x and w, put into z
-
-                //subtract y actual from z (ypred) and make nu z*2
-
-                //Duality gap
-                //Matrix mul nu, xnu??
-                //Get normInf?
-                //multiply every element of nu by lnu if maxXnu is > lambda
-
-                //Primal objective function value: (will have to increase size for multi output)
-                //Early stopping (need to make dot product kernal)
-
-
-                //update t
-
-                //Newton step
-
-
-                //x.tv(z, gradphi[0])
-                ////Calculate gradient
-
-
-                ////Calculate vectors to use in preconditioner
-
-                //set pcg tolerance
-
-                //PCG.solve**** BIG FUNCTION
-                //Only need to include what updates Dxu
-                /*
-                mv(p, z);
-                for (akden = 0.0, j = 0; j < n; j++) {
-                    akden += z[j] * pp[j];
-                }
-                ak = bknum / akden;
-                for (j = 0; j < n; j++) {
-                    x[j] += ak * p[j];
-                }
-                */
-
-                //Backtracking line search
                 
-                // Console.WriteLine("ColMeansBuffer");
-                // print1d(this.ColMeansBuffer.GetAsArray1D());
-                // Console.WriteLine("WBuffeR");
-                // print1d(this.WBuffer.GetAsArray1D());
                 setBuffToValueKern(this.DotProdBufferWxCenter.Extent.ToIntIndex(), this.DotProdBufferWxCenter.View, 0.0);
+                setBuffToValueKern(testDotProdBufferZxZ.Extent.ToIntIndex(), testDotProdBufferZxZ.View, 0.0);
                 
                 WFinaleKern(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.ColSTDBuffer.View, c);
-                DotKern(this.DotProdBufferWxCenter.Extent.ToIntIndex(), this.WBuffer.View, this.ColMeansBuffer.View, this.DotProdBufferWxCenter.View, this.WBuffer.Extent.ToIntIndex().X);
+
+                //DotKern(this.DotProdBufferWxCenter.Extent.ToIntIndex(), this.WBuffer.View, this.ColMeansBuffer.View, this.DotProdBufferWxCenter.View, this.WBuffer.Extent.ToIntIndex().X);
+                SingleDotKern(Pdimension, this.WBuffer.View, this.ColMeansBuffer.View, this.DotProdBufferWxCenter.View,PgroupSize, Premainder);
+
+             
 
                 
 
-                // Console.WriteLine("YMEAN SUM:");
-                // Console.WriteLine(ymeansum/Y.GetLength(0));
-                // Console.WriteLine("DotProdBufferWxCenter.GetAsArray1D()[0]:");
-                // Console.WriteLine(DotProdBufferWxCenter.GetAsArray1D()[0]);
-                getasarraytimes.Start();
+            
                 this.B = ymeansum/Y.GetLength(0) - DotProdBufferWxCenter.GetAsArray1D()[0];
-                getasarraytimes.Stop();
-                // Console.WriteLine("B");
-                // Console.WriteLine(this.B);
-                // Console.WriteLine("WBuffeR");
-                // print1d(this.WBuffer.GetAsArray1D());
-                // Console.WriteLine("this.YMeanBuffer.GetAsArray1D()[0]");
-                // Console.WriteLine(this.YMeanBuffer.GetAsArray1D()[0]);
-                // Console.WriteLine("DotProdBufferWxCenter.GetAsArray1D()[0]");
-                // Console.WriteLine(DotProdBufferWxCenter.GetAsArray1D()[0]);
+           
 
                 this.W = this.WBuffer.GetAsArray1D();
+                
 
-                Console.WriteLine("GET AS ARRAY TIMES");
-                Console.WriteLine(getasarraytimes.Elapsed);
-                Console.WriteLine("timeonfunction");
-                Console.WriteLine(timeonfunction.Elapsed);
+                
             }
+            getasarraytimes.Stop();
+            
+            Console.WriteLine("GET AS ARRAY TIMES");
+            Console.WriteLine(getasarraytimes.Elapsed);
+            Console.WriteLine("timeonfunction");
+
+            Console.WriteLine(timeonfunction.Elapsed);
             // /Console.ReadLine();
             return this;
 
 
+        }
+        static void TripleDotKernal(
+            ArrayView<double> aView,
+            ArrayView<double> bView,
+            ArrayView<double> Output,
+            ArrayView<double> aView2,
+            ArrayView<double> Output2,
+            ArrayView<double> aView3,
+            ArrayView<double> Output3,
+            int gridsize, int remainder)        // A view to a chunk of memory (1D in this case)
+        {
+
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+            ref double sharedVariable2 = ref ILGPU.SharedMemory.Allocate<double>();
+            ref double sharedVariable3 = ref ILGPU.SharedMemory.Allocate<double>();
+            double val = 0.0;
+            double val2 = 0.0;
+            double val3 = 0.0;
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                sharedVariable = 0;
+                sharedVariable2 = 0;
+                sharedVariable3 = 0;
+                
+
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < aView.Length){
+                val = aView[globalIndex*gridsize + localindex] *bView[globalIndex*gridsize + localindex];
+                Atomic.Add(ref sharedVariable, val);
+                val2 = aView2[globalIndex*gridsize + localindex] * aView2[globalIndex*gridsize + localindex];
+                Atomic.Add(ref sharedVariable2, val2);
+                val3 = aView3[globalIndex*gridsize + localindex] * aView3[globalIndex*gridsize + localindex];
+                Atomic.Add(ref sharedVariable3, val3);
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref Output[0], sharedVariable);
+                Atomic.Add(ref Output2[0], sharedVariable2);    
+                Atomic.Add(ref Output3[0], sharedVariable3);        
+            }   
+            //Compute the global 1D index for accessing the data view
+            //int globalIndex = Grid.LinearIndex;
+            
+            // int localindex = Group.LinearIndex;
+            // Index1D ind;
+            // // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            // ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref double sharedVariable2 = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref double sharedVariable3 = ref ILGPU.SharedMemory.Allocate<double>();
+            
+            // // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+            // // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
+            // // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
+
+            // // Initialize shared memory
+            // if (Group.IsFirstThread)
+            //     sharedVariable = 0;
+            //     sharedVariable2 = 0;
+            //     sharedVariable3 = 0;
+                
+            // // Wait for the initialization to complete
+            
+            // Group.Barrier();
+            // //Atomic.Add(ref sharedIndex , localindex);
+            // if (Group.IsLastThread){
+
+            //     for(int i = 0; i < remainder; i++){
+                    
+            //         if (localindex*gridsize + i < aView.Length){
+            //             ind =new Index1D(localindex-1*gridsize + i);
+            //             Atomic.Add(ref sharedVariable, aView[ind] * bView[ind]);
+            //             Atomic.Add(ref sharedVariable2, aView2[ind] * aView2[ind]);
+            //             Atomic.Add(ref sharedVariable3, aView3[ind] * aView3[ind]);
+                        
+            //             //Atomic.Add(ref sharedIndex , 1);
+            //             //Atomic.Add(ref sharedIndex2 , 1);
+            //             //Atomic.Add(ref sharedIndex, 1.0);
+            //             //Group.Barrier();
+            //         }
+            //         else{
+            //             break;
+            //         }
+            //     }
+            // }
+            // else{
+            //     //int counter = 0;
+            //     for(int i = 0; i < gridsize; i++){
+                   
+            //         if (localindex*gridsize + i < aView.Length){
+                        
+            //             ind =new Index1D(localindex*gridsize + i);
+            //             Atomic.Add(ref sharedVariable, aView[ind] * bView[ind]);
+            //             Atomic.Add(ref sharedVariable2, aView2[ind] * aView2[ind]);
+            //             Atomic.Add(ref sharedVariable3, aView3[ind] * aView3[ind]);
+            //             //Atomic.Add(ref sharedIndex, 1.0);
+            //             //Atomic.Add(ref sharedIndex , 1);
+            //             //Atomic.Add(ref sharedIndex3 , 1);
+            //             //Group.Barrier();
+                        
+            //         }
+            //         else{
+            //             break;
+            //         }
+            //     }
+            // }   
+            
+            // // Wait for all threads to complete the maximum computation process
+            // Group.Barrier();
+            // Output[new Index1D(0)] =sharedVariable;
+            // Output2[new Index1D(0)] =sharedVariable2;
+            // Output3[new Index1D(0)] =sharedVariable3;
+
+            
+            
+        }
+        static void SingleDotKernal(
+            ArrayView<double> aView,
+            ArrayView<double> bView,
+            ArrayView<double> Output,
+            int gridsize, int remainder)        // A view to a chunk of memory (1D in this case)
+        {
+
+
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+        
+            double val = 0.0;
+           
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                sharedVariable = 0;
+                
+                
+
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < aView.Length){
+                val = aView[globalIndex*gridsize + localindex] *bView[globalIndex*gridsize + localindex];
+                Atomic.Add(ref sharedVariable, val);
+                
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref Output[0], sharedVariable);
+                
+            }  
+            // //Compute the global 1D index for accessing the data view
+            // //int globalIndex = Grid.LinearIndex;
+            
+            // int localindex = Group.LinearIndex;
+            // Index1D ind;
+            // // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            // ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+           
+            // // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+            // // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
+            // // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
+
+            // // Initialize shared memory
+            // if (Group.IsFirstThread)
+            //     sharedVariable = 0;
+                
+            // // Wait for the initialization to complete
+            
+            // Group.Barrier();
+            // //Atomic.Add(ref sharedIndex , localindex);
+            // if (Group.IsLastThread){
+
+            //     for(int i = 0; i < remainder; i++){
+                    
+            //         if (localindex*gridsize + i < aView.Length){
+            //             ind =new Index1D(localindex*gridsize + i);
+            //             Atomic.Add(ref sharedVariable, aView[ind] * bView[ind]);
+                       
+                        
+            //             //Atomic.Add(ref sharedIndex , 1);
+            //             //Atomic.Add(ref sharedIndex2 , 1);
+            //             //Atomic.Add(ref sharedIndex, 1.0);
+            //             //Group.Barrier();
+            //         }
+            //         else{
+            //             break;
+            //         }
+            //     }
+            // }
+            // else{
+            //     //int counter = 0;
+            //     for(int i = 0; i < gridsize; i++){
+                   
+            //         if (localindex*gridsize + i < aView.Length){
+                        
+            //             ind =new Index1D(localindex*gridsize + i);
+            //             Atomic.Add(ref sharedVariable, aView[ind] * bView[ind]);
+            //                                    //Atomic.Add(ref sharedIndex, 1.0);
+            //             //Atomic.Add(ref sharedIndex , 1);
+            //             //Atomic.Add(ref sharedIndex3 , 1);
+            //             //Group.Barrier();
+                        
+            //         }
+            //         else{
+            //             break;
+            //         }
+            //     }
+            // }   
+            
+            // // Wait for all threads to complete the maximum computation process
+            // Group.Barrier();
+            // Output[new Index1D(0)] =sharedVariable;
+            
+
+            
+            
+        }
+        static void SMNormKernal(
+            ArrayView<double> aView,
+            ArrayView<double> Output,
+            int gridsize)        // A view to a chunk of memory (1D in this case)
+        {
+
+
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+        
+            double val = 0.0;
+           
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                sharedVariable = 0;
+                
+                
+
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < aView.Length){
+                val = Math.Abs(aView[globalIndex*gridsize + localindex]);
+                Atomic.Add(ref sharedVariable, val);
+                
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref Output[0], sharedVariable);
+                
+            }
+        }
+        static void SingleSelfDotKernal(
+            ArrayView<double> aView,
+            ArrayView<double> Output,
+            int gridsize, int remainder)        // A view to a chunk of memory (1D in this case)
+        {
+
+
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+        
+            double val = 0.0;
+           
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                sharedVariable = 0;
+                
+                
+
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < aView.Length){
+                val = aView[globalIndex*gridsize + localindex] *aView[globalIndex*gridsize + localindex];
+                Atomic.Add(ref sharedVariable, val);
+                
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref Output[0], sharedVariable);
+                
+            }  
+           //  //Compute the global 1D index for accessing the data view
+           //  //int globalIndex = Grid.LinearIndex;
+            
+           //  int localindex = Group.LinearIndex;
+           //  double val;
+           //  Index1D ind;
+           //  // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+           //  ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+           
+           // // ref double sharedIndex = ref ILGPU.SharedMemory.Allocate<double>();
+           //  // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
+           //  // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
+
+           //  // Initialize shared memory
+           //  if (Group.IsFirstThread)
+           //      sharedVariable = 0;
+                
+           //  // Wait for the initialization to complete
+            
+           //  Group.Barrier();
+           //  //Atomic.Add(ref sharedIndex , localindex);
+           //  if (Group.IsLastThread){
+
+           //      for(int i = 0; i < remainder; i++){
+                    
+           //          if (localindex*gridsize + i < aView.Length){
+
+           //              ind =new Index1D(localindex*gridsize + i);
+           //              val = aView[ind] * aView[ind];
+           //              Atomic.Add(ref sharedVariable, val);
+           //              //Atomic.Add(ref sharedIndex, 1.0);
+           //              //Output[ind] =  10000;
+           //              //Atomic.Add(ref sharedIndex , 1);
+           //              //Atomic.Add(ref sharedIndex2 , 1);
+           //              //Atomic.Add(ref sharedIndex, 1.0);
+           //              //Group.Barrier();
+           //          }
+           //          else{
+           //              break;
+           //          }
+           //      }
+           //  }
+           //  else{
+           //      //int counter = 0;
+           //      for(int i = 0; i < gridsize; i++){
+                   
+           //          if (localindex*gridsize + i < aView.Length){
+                        
+           //              ind =new Index1D(localindex*gridsize + i);
+           //              val =aView[ind] * aView[ind];
+           //              Atomic.Add(ref sharedVariable, val);
+           //              //Atomic.Add(ref sharedIndex, 1.0);
+           //              //Output[ind] =  aView[ind];
+           //                                     //Atomic.Add(ref sharedIndex, 1.0);
+           //              //Atomic.Add(ref sharedIndex , 1);
+           //              //Atomic.Add(ref sharedIndex3 , 1);
+           //              //Group.Barrier();
+                        
+           //          }
+           //          else{
+           //              break;
+           //          }
+           //      }
+           //  }   
+            
+           //  // Wait for all threads to complete the maximum computation process
+           //  Group.Barrier();
+           //  Output[new Index1D(0)] =sharedVariable;
+           //  //Output[new Index1D(1)] =sharedIndex;
+            
+
+            
+            
         }
         //Attempt to speed up function by moving all of lsiter into one kernal
         static void lsiterKernal(Index1D ind,
@@ -1882,6 +2559,152 @@ namespace ElasticNetRegression
             }
 
         }
+        static void SharedMemoryArrayKernel(
+            ArrayView<double> dataView,     // A view to a chunk of memory (1D in this case)
+            ArrayView<double> outputView)   // A view to a chunk of memory (1D in this case)
+        {
+            // Compute the global 1D index for accessing the data view
+            int globalIndex = Grid.GlobalIndex.X;
+
+            // Declares a shared-memory array with 128 elements of type int = 4 * 128 = 512 bytes
+            // of shared memory per group
+            // Note that 'Allocate' requires a compile-time known constant array size.
+            // If the size is unknown at compile-time, consider using `GetDynamic`.
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+
+
+            if (Group.IsFirstThread)
+                sharedVariable = 0;
+            // Load the element into shared memory
+            // var value = globalIndex < dataView.Length ?
+            //     dataView[globalIndex] :
+            //     0;
+            // sharedArray[Group.IdxX] = value;
+
+            // Wait for all threads to complete the loading process
+            Group.Barrier();
+            Atomic.Add(ref sharedVariable, dataView[globalIndex]);
+
+            // Compute the sum over all elements in the group
+            // double sum = 0;
+            // for (int i = 0, e = Group.Dimension.X; i < e; ++i)
+            //     sum += sharedArray[i];
+            Group.Barrier();
+            // Store the sum
+            //if (globalIndex < outputView.Length)
+            Atomic.Add(ref outputView[0],  dataView[globalIndex]);
+        }
+        static void SharedMemoryVariableKerneL(
+            ArrayView<double> dataView,          // A view to a chunk of memory (1D in this case)
+            ArrayView<double> outputView,
+            int gridsize, int remainder)        // A view to a chunk of memory (1D in this case)
+        {
+            //Compute the global 1D index for accessing the data view
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+            // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
+            // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
+
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                 sharedVariable = 0;
+                 
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < dataView.Length){
+                Atomic.Add(ref sharedVariable, dataView[globalIndex*gridsize + localindex]);
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref outputView[0], sharedVariable);    
+            }   
+           
+
+            
+        }
+        static void SMSumOfKernal(
+            ArrayView<double> dataView,          // A view to a chunk of memory (1D in this case)
+            ArrayView<double> outputView,
+            int gridsize)        // A view to a chunk of memory (1D in this case)
+        {
+            //Compute the global 1D index for accessing the data view
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+            // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
+            // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
+
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                 sharedVariable = 0;
+                 
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < dataView.Length){
+                Atomic.Add(ref sharedVariable, dataView[globalIndex*gridsize + localindex]);
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref outputView[0], sharedVariable);    
+            }   
+           
+
+            
+        }
+        static void SMSumLogNegKernal(
+            ArrayView2D<double, Stride2D.DenseX> dataView,          // A view to a chunk of memory (1D in this case)
+            ArrayView<double> outputView,
+            int gridsize)        // A view to a chunk of memory (1D in this case)
+        {
+            //Compute the global 1D index for accessing the data view
+            int globalIndex = Grid.LinearIndex;
+            
+            int localindex = Group.LinearIndex;
+
+            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
+            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
+            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
+            // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
+            // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
+            double val =0.0;
+            // Initialize shared memory
+            if (Group.IsFirstThread)
+                 sharedVariable = 0;
+                 
+            Group.Barrier();
+            
+            if (globalIndex*gridsize + localindex < dataView.Length){
+                val = Math.Log(-1.0 *dataView[new Index2D(0, globalIndex*gridsize + localindex)]);
+                Atomic.Add(ref sharedVariable, val);
+                val = Math.Log( -1.0 *dataView[new Index2D(1, globalIndex*gridsize + localindex)]);
+                Atomic.Add(ref sharedVariable, val);
+            }
+           
+            Group.Barrier();   
+            
+            if (Group.IsLastThread){
+
+                Atomic.Add(ref outputView[0], sharedVariable);    
+            }   
+           
+
+            
+        }
         static void nphicompkernal(Index1D index, 
             ArrayView1D<double, Stride1D.Dense> phi,
             ArrayView1D<double, Stride1D.Dense> newphi,
@@ -1966,12 +2789,16 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> newwView,
             ArrayView1D<double, Stride1D.Dense> newuView,
             ArrayView2D<double, Stride2D.DenseX> newfView,
+            ArrayView1D<double, Stride1D.Dense> fmax,
             double s)
         {
             newwView[index] = wView[index] + s * dxView[index];
             newuView[index] = uView[index] + s * duView[index];
             newfView[new Index2D(0, index.X)] = newwView[index] - newuView[index];
             newfView[new Index2D(1, index.X)] = (-1.0 * newwView[index]) - newuView[index];
+            if(newfView[new Index2D(0, index.X)] > 0 || newfView[new Index2D(1, index.X)] > 0){
+                fmax[0] = 1.0;
+            }
 
         }
 
@@ -2133,6 +2960,29 @@ namespace ElasticNetRegression
 
 
         }
+        static void GradPhiAndPreconditionerKernal(Index1D index,
+            ArrayView2D<double, Stride2D.DenseX> GradPhiView,
+            ArrayView1D<double, Stride1D.Dense> q1View,
+            ArrayView1D<double, Stride1D.Dense> q2View,
+            ArrayView1D<double, Stride1D.Dense> gradView,
+            double t,
+            double lambda,
+            int p,
+            ArrayView1D<double, Stride1D.Dense> prbView,
+            ArrayView1D<double, Stride1D.Dense> prsView,
+            ArrayView1D<double, Stride1D.Dense> d1View,
+            ArrayView1D<double, Stride1D.Dense> d2View,
+            ArrayView1D<double, Stride1D.Dense> diagxtxView
+            )
+        {
+            GradPhiView[new Index2D(0, index.X)] = (2.0 * GradPhiView[new Index2D(0, index.X)]) - ((q1View[index] - q2View[index]) / t);
+            GradPhiView[new Index2D(1, index.X)] = lambda - (q1View[index] + q2View[index]) / t;//
+            gradView[index] = -1.0 * GradPhiView[new Index2D(0, index.X)];
+            gradView[new Index1D(index.X + p)] = -1.0 * GradPhiView[new Index2D(1, index.X)];
+            prbView[index] = diagxtxView[index] + d1View[index];
+            prsView[index] = (prbView[index] * d1View[index]) - (d2View[index] * d2View[index]);
+
+        }
         static void PreconditionerVectorKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> prbView,
             ArrayView1D<double, Stride1D.Dense> prsView,
@@ -2174,6 +3024,7 @@ namespace ElasticNetRegression
                 sum[index] += aView[new Index1D(i)];
 
             }
+            //Atomic.Add(ref sum[new Index1D(0)], aView[index]); 
         }
         static void NewtonStepKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> uView,
@@ -2235,6 +3086,11 @@ namespace ElasticNetRegression
                 Output[index] += aView[new Index1D(i)] * aView[new Index1D(i)];
             }
 
+        }
+        static void sqrtkernal(Index1D index,
+            ArrayView1D<double, Stride1D.Dense> aView)
+        {
+            aView[index] = Math.Sqrt(aView[index]);
         }
         static void NormKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> aView,
@@ -3270,6 +4126,13 @@ namespace ElasticNetRegression
                 // Yactual[i, 1] = ((Xactual[i, 0]) * 100 + 100);
                 //Yactual[i, 1] = ((Xactual[i, 0]) * 1000 + 2000);
             }
+            double ysum = 0.0;
+            for (int x = 0; x < tempy.GetLength(0); x++)
+            {
+                ysum += tempy[x];
+            }
+            Console.WriteLine("y sum");
+            Console.WriteLine(ysum);
             String s = "datasets/DataSet" + Math.Pow(10, n).ToString() + "x" + Math.Pow(10, m).ToString() + ".csv";
             String xs = "datasets/XDataSet" + Math.Pow(10, n).ToString() + "x" + Math.Pow(10, m).ToString() + ".csv";
             String ys = "datasets/YDataSet" + Math.Pow(10, n).ToString() + "x" + Math.Pow(10, m).ToString() + ".csv";
@@ -3428,12 +4291,12 @@ namespace ElasticNetRegression
             ElasticRegression e1 = new ElasticRegression(0.005f, 10, .5f, .5f);
             ElasticRegression e3 = new ElasticRegression(0.005f, 10, .5f, .5f);
             // /ElasticNet enet = new ElasticNet(0.005f, 10, .5f, .5f);
-
+ 
 
             // MemoryBuffer1D<double, Stride1D.Dense> ColMeansBuffer = accelerate.Allocate1D<double>(10l);
             //    Console.WriteLine(ColMeansBuffer.Extent.ToIntIndex().X.GetType());
             //Console.ReadLine();
-            e1.test(6,4);
+            //e1.test(6,4);
             ////    Console.ReadLine();
             // double[,] kernaltesta = new double[10,10];
             // double[,] kernaltestb = new double[10,10];
@@ -3449,7 +4312,7 @@ namespace ElasticNetRegression
             //     //Xactual[i, 1] = ((double)q.NextDouble() * 10) + 2;
 
             // }
-            // 
+            //  
             // 
             /////Context context = Context.Create(builder => builder.AllAccelerators());
             // Device dev = context.GetPreferredDevice(preferCPU: false);
@@ -3509,7 +4372,7 @@ namespace ElasticNetRegression
             ElasticNet enet = new ElasticNet(0.005f, 100, 0.05f, 0.05f);
             Stopwatch stopwtch = new Stopwatch();
             stopwtch.Start();
-            enet.fit(caspX, caspY, 4.5, 4.5, 1E-30, 100);
+            enet.fit(caspX, caspY, 4.5, 4.5, 1E-100, 100);
             //double[,] res2 = e2.predict(Xactual);
             stopwtch.Stop();
            
@@ -3522,7 +4385,7 @@ namespace ElasticNetRegression
             //e1.print1d(pred);
 
             double error = 0.0;
-            double averr = 0.0;
+            //double averr = 0.0;
 
             for(int i = 0; i< pred.GetLength(0); i++){
                error += Math.Abs(caspY[i] - pred[i]);
@@ -3539,6 +4402,7 @@ namespace ElasticNetRegression
             Console.WriteLine("W");
             
             e1.print1d(enet.W);
+            Console.WriteLine(enet.B);
 
 
             // for(int i = 0; i < Yactual.GetLength(0); i ++){
