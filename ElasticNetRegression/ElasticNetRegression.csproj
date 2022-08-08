@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CsvHelper" Version="28.0.0" />
     <PackageReference Include="ILGPU" Version="1.2.0" />
     <PackageReference Include="ILGPU.Algorithms" Version="1.2.0" />
   </ItemGroup>

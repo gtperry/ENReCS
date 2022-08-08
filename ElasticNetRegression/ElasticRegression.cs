@@ -39,6 +39,7 @@ namespace ElasticNetRegression
         public double[] W;
         
         const int COLLIMIT = 10000;
+        const int ROWLIMIT = 10000;
         MemoryBuffer2D<double, Stride2D.DenseX> XBuffer;
         MemoryBuffer2D<double, Stride2D.DenseX> X2Buffer;
         MemoryBuffer2D<double, Stride2D.DenseX> X2InverseBuffer;
@@ -119,254 +120,7 @@ namespace ElasticNetRegression
         MemoryBuffer1D<int, Stride1D.Dense> CompPhiBuffer;
 
         
-        // Action<Index1D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> columnMeansKern;
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> columnMeans1DKern;
-        // Action<Index1D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,                
-        //     int>> columnSTDevKern;
-        // Action<Index1D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double, double, int, int>> x2fillkern;
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> subByColumnsKern;
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double>> setBuffToValueKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView2D<double, Stride2D.DenseX>> FFillKern;
-        // Action<Index1D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> matrixmulkern;
-        // Action<Index2D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView2D<double, Stride2D.DenseX>> matrixmul2dkern;
-
-        // Action<Index1D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView2D<double, Stride2D.DenseX>> matrixmulGradphikern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> InitializeNuKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> GetMaxValKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double,
-        //     int>> DualityGapKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double>> PobjKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double>> DobjKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> NormKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double>> NewtonStepKern;
-
-        // Action<Index1D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double, double, int>> GradPhiKern;
-
-        // Action<Index2D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView2D<double, Stride2D.DenseX>> fillInverseMatrixKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> PCGmvKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     int>> PCGasolveKern;
-       
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> RandRRFillKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> FillPsKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> FirstIterationFillPsKern;
-
-        // Action<Index2D,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView2D<double, Stride2D.DenseX>> CopyBufferKern2D;
         
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> CopyBufferKern1D;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> SubFromRsKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> PreconditionerVectorKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> calcErrorKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> splitDXUKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView2D<double, Stride2D.DenseX>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double>> setnewBuffersKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double, double>> CalcphiKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>> SubYFromZKern;
-
-        // Action<Index1D,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     ArrayView1D<double, Stride1D.Dense>,
-        //     double>> WFinaleKern;
-
-        // Action<Index1D , 
-        //     ArrayView1D<double, Stride1D.Dense> ,
-        //     ArrayView1D<double, Stride1D.Dense> ,
-        //     ArrayView1D<double, Stride1D.Dense> ,
-        //     ArrayView1D<int, Stride1D.Dense> ,
-        //     double ,
-        //     double>> nphicompkern;
-
-
-
-      
-
-
-            // var TripleDotKern= this.accelerate.LoadStreamKernel<
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     int, int >(TripleDotKernal);
-
-            // var SingleDotKern= this.accelerate.LoadStreamKernel<
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     ArrayView<double>,
-            //     int, int >(SingleDotKernal);
-
-            // var SingleSelfDotKern= this.accelerate.LoadStreamKernel<
-            //     ArrayView<double>,
-                
-            //     ArrayView<double>,
-            //     int, int >(SingleSelfDotKernal);
-            // var sharedMemArrKern = this.accelerate.LoadStreamKernel<
-            //         ArrayView<double>, ArrayView<double>>(SharedMemoryArrayKernel);
-
-            // var SharedMemoryVariableKern= this.accelerate.LoadStreamKernel<
-            //     ArrayView<double>,          
-            //     ArrayView<double>,int,int>(SharedMemoryVariableKerneL); 
-            // var SMSumOfKern = this.accelerate.LoadStreamKernel<
-            //     ArrayView<double>,          
-            //     ArrayView<double>,int>(SMSumOfKernal); 
-            // var SMNormKern = this.accelerate.LoadStreamKernel<
-            //     ArrayView<double>,          
-            //     ArrayView<double>,int>(SMNormKernal); 
-            // var SMSumLogNegKern= this.accelerate.LoadStreamKernel<
-            //     ArrayView2D<double, Stride2D.DenseX>,          // A view to a chunk of memory (1D in this case)
-            //     ArrayView<double>,
-            //     int>(SMSumLogNegKernal);
-            // var sqrtkern= this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
-            //         ArrayView1D<double, Stride1D.Dense>>(sqrtkernal);
-       
 
         public ElasticNet(double learning_rate, int iterations, double l1_penality, double l2_penality, bool fullGPU = false)
         {
@@ -412,14 +166,15 @@ namespace ElasticNetRegression
             //double lambda2 = 0.5f;
             timeonfunction.Start();
             this.P = X.GetLength(1);
-            int X2length = X.GetLength(0) + this.P;
+            this.N = X.GetLength(0);
+            int X2length = this.N + this.P;
 
             
             double ymeansum = 0.0;
             int bval;
-            double[] Y2 = new double[Y.GetLength(0) + this.P];
+            double[] Y2 = new double[this.N + this.P];
             Array.Fill(Y2, 0.0);
-            for (int i = 0; i < Y.GetLength(0); i++)
+            for (int i = 0; i < this.N; i++)
             {
                 
                 Y2[i] = Y[i];
@@ -439,10 +194,12 @@ namespace ElasticNetRegression
             //Default val =  0.2182179,
             double padding = c * Math.Sqrt(lambda2);
             //Number of rows
+            int n = X.GetLength(0);
+            int p = X.GetLength(1);
             
-            this.N = X.GetLength(0);
+            
             this.accelerate = this.dev.CreateAccelerator(this.context);
-            this.XBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(X.GetLength(0), X.GetLength(1)));
+            this.XBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(this.N, this.P));
             this.ColMeansBuffer = this.accelerate.Allocate1D<double>((long)X.GetLength(1));
             this.ColSTDBuffer = this.accelerate.Allocate1D<double>((long)X.GetLength(1));
             //ColSTDBuffer.CopyFromCPU(sds);
@@ -878,6 +635,12 @@ namespace ElasticNetRegression
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(SMMatMul1DKernal);
+
+            var SMMatMul1DKernTooLarge  = this.accelerate.LoadAutoGroupedStreamKernel<Index2D,
+                ArrayView2D<double, Stride2D.DenseX>,
+                ArrayView1D<double, Stride1D.Dense>,
+                ArrayView1D<double, Stride1D.Dense>>(SMMatMul1DKernalTooLarge);
+                
             
             timeonfunction.Stop();
 
@@ -890,8 +653,7 @@ namespace ElasticNetRegression
             double eta = 1e-3;
 
             int pitr = 0;
-            int n = X.GetLength(0);
-            int p = X.GetLength(1);
+            
             double lambda = lambda1 * c;
             double t = Math.Min(Math.Max(1.0, 1.0 / lambda), (2 * p / 1e-3));
             double zero = 0;
@@ -985,7 +747,7 @@ namespace ElasticNetRegression
                 Console.WriteLine("10");
                 //matrixmul2dkern(this.ATABuffer.Extent.ToIntIndex(), this.X2InverseBuffer.View, this.X2Buffer.View, this.ATABuffer.View);
                 //MatrixMultiplyTiledKern((xnumgroups, xgroupsize), this.X2InverseBuffer, this.X2Buffer, this.ATABuffer);
-                if(p < COLLIMIT){
+                if(p < COLLIMIT && n < ROWLIMIT){
                     SMMatMul2DKern(new Index3D(this.X2InverseBuffer.Extent.ToIntIndex().X, this.X2InverseBuffer.Extent.ToIntIndex().Y, this.X2Buffer.Extent.ToIntIndex().Y),  this.X2InverseBuffer.View, this.X2Buffer.View, this.ATABuffer.View);
                 }
                 else{
@@ -1013,7 +775,12 @@ namespace ElasticNetRegression
 
                     //matrixmulkern(this.XNuBuffer.Extent.ToIntIndex(), this.X2InverseBuffer.View, this.NuBuffer.View, this.XNuBuffer.View);
                     setBuffToValueKern(this.XNuBuffer.Extent.ToIntIndex(), this.XNuBuffer.View, 0.0);
-                    SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.NuBuffer.View, this.XNuBuffer.View);
+                    if(this.X2InverseBuffer.Extent.ToIntIndex().Y < 65535 ){
+                        SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.NuBuffer.View, this.XNuBuffer.View);
+                    }
+                    else{
+                        SMMatMul1DKernTooLarge(this.X2Buffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.NuBuffer.View, this.XNuBuffer.View);
+                    }
                     //Console.WriteLine("Test");
                     //print1d(TESTXNuBuffer.GetAsArray1D());
                     //Console.WriteLine(" Actual");
@@ -1091,7 +858,7 @@ namespace ElasticNetRegression
                     }
 
                     //matrixmulkern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATABuffer.View, this.DXUBuffer.View, this.ATAXBuffer.View);
-                    if(p < COLLIMIT){
+                    if(p < COLLIMIT && n < ROWLIMIT){
                         setBuffToValueKern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATAXBuffer.View, 0.0);
                         SMMatMul1DKern(this.ATABuffer.Extent.ToIntIndex(),this.ATABuffer.View, this.DXUBuffer.View, this.ATAXBuffer.View);
                     }
@@ -1100,7 +867,13 @@ namespace ElasticNetRegression
                         SMMatMul1DKern(this.X2Buffer.Extent.ToIntIndex(),this.X2Buffer.View, this.DXUBuffer.View, this.AXBuffer.View);
 
                         setBuffToValueKern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATAXBuffer.View, 0.0);
-                        SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                        if(this.X2InverseBuffer.Extent.ToIntIndex().Y < 65535 ){
+                            SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                        }
+                        else{
+                            SMMatMul1DKernTooLarge(this.X2Buffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                        }
+                        //SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
 
                     }
                         
@@ -1145,7 +918,7 @@ namespace ElasticNetRegression
 
                         //matrixmulkern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATABuffer.View, this.PCGBufferP.View, this.ATAXBuffer.View);
                         //SMMatMul1DKern(this.ATABuffer.Extent.ToIntIndex(),this.ATABuffer.View, this.PCGBufferP.View, this.ATAXBuffer.View);
-                        if(p < COLLIMIT){
+                        if(p < COLLIMIT && n < ROWLIMIT){
                             setBuffToValueKern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATAXBuffer.View, 0.0);
                             SMMatMul1DKern(this.ATABuffer.Extent.ToIntIndex(),this.ATABuffer.View, this.PCGBufferP.View, this.ATAXBuffer.View);
                         }
@@ -1154,7 +927,14 @@ namespace ElasticNetRegression
                             SMMatMul1DKern(this.X2Buffer.Extent.ToIntIndex(),this.X2Buffer.View, this.PCGBufferP.View, this.AXBuffer.View);
 
                             setBuffToValueKern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATAXBuffer.View, 0.0);
-                            SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                            if(this.X2InverseBuffer.Extent.ToIntIndex().Y < 65535 ){
+                                SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                            }
+                            else{
+                                SMMatMul1DKernTooLarge(this.X2Buffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                            }
+
+                            //SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
 
                         }
 
@@ -1170,7 +950,7 @@ namespace ElasticNetRegression
 
                         
                         //matrixmulkern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATABuffer.View, this.PCGBufferPP.View, this.ATAXBuffer.View);
-                        if(p < COLLIMIT){
+                        if(p < COLLIMIT && n < ROWLIMIT){
                             setBuffToValueKern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATAXBuffer.View, 0.0);
                             SMMatMul1DKern(this.ATABuffer.Extent.ToIntIndex(),this.ATABuffer.View, this.PCGBufferPP.View, this.ATAXBuffer.View);
                         }
@@ -1179,7 +959,13 @@ namespace ElasticNetRegression
                             SMMatMul1DKern(this.X2Buffer.Extent.ToIntIndex(),this.X2Buffer.View, this.PCGBufferPP.View, this.AXBuffer.View);
 
                             setBuffToValueKern(this.ATAXBuffer.Extent.ToIntIndex(), this.ATAXBuffer.View, 0.0);
-                            SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                            if(this.X2InverseBuffer.Extent.ToIntIndex().Y < 65535 ){
+                                SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                            }
+                            else{
+                                SMMatMul1DKernTooLarge(this.X2Buffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
+                            }
+                            //SMMatMul1DKern(this.X2InverseBuffer.Extent.ToIntIndex(),this.X2InverseBuffer.View, this.AXBuffer.View, this.ATAXBuffer.View);
 
                         }
 
@@ -2492,6 +2278,21 @@ namespace ElasticNetRegression
 
 
         }
+        static void SMMatMul1DKernalTooLarge(Index2D index,
+            ArrayView2D<double, Stride2D.DenseX> aView,
+            ArrayView1D<double, Stride1D.Dense> bView,
+            ArrayView1D<double, Stride1D.Dense> cView){
+
+            var x = index.X;
+            var y = index.Y;
+            
+            
+            double val = aView[new Index2D(y,x)] * bView[new Index1D(x)];
+            //Group.Barrier();
+            Atomic.Add(ref cView[new Index1D(y)], val);
+
+
+        }
         static void MatrixMultiplyGradphiKernel(
             Index1D index,
             ArrayView2D<double, Stride2D.DenseX> aView,
@@ -3368,7 +3169,7 @@ namespace ElasticNetRegression
             double[,] outputs = new double[n * m, 4];
             double[] outf = new double[4];
             int counter = 0;
-            for (int i = 2; i < n; i++)
+            for (int i = 5; i < n; i++)
             {
                 for (int j = 2; j < m; j++)
                 {
@@ -3471,35 +3272,9 @@ namespace ElasticNetRegression
             // //learning_rate, iterations, l1_penality, l2_penality 
             ElasticNet e1 = new ElasticNet(0.005, 10, .5, .5);
             ElasticNet e3 = new ElasticNet(0.005, 10, .5, .5);
-            // /ElasticNet enet = new ElasticNet(0.005f, 10, .5f, .5f);
- 
-
-            // MemoryBuffer1D<double, Stride1D.Dense> ColMeansBuffer = accelerate.Allocate1D<double>(10l);
-            //    Console.WriteLine(ColMeansBuffer.Extent.ToIntIndex().X.GetType());
-            //Console.ReadLine();
+            
             e1.test(7,5);
-            ////    Console.ReadLine();
-            // double[,] kernaltesta = new double[10,10];
-            // double[,] kernaltestb = new double[10,10];
-            // double county = 0.0;
-            // for (int i = 0; i < kernaltesta.GetLength(0); i++)
-            // {
-            //     for(int j=0; j < kernaltesta.GetLength(1); j++){
-            //         kernaltesta[i, j] = 5.4f + county;
-            //         kernaltestb[i, j] = 10.3f + county;
-            //         county +=1;
-
-            //     }
-            //     //Xactual[i, 1] = ((double)q.NextDouble() * 10) + 2;
-
-            // }
-            //  
-            // 
-            /////Context context = Context.Create(builder => builder.AllAccelerators());
-            // Device dev = context.GetPreferredDevice(preferCPU: false);
-            // Accelerator aa = dev.CreateAccelerator(context);
-            // e1.print2d(kernalTester(aa, kernaltesta, kernaltestb));
-            ///Console.ReadLine();
+           
             // aa.Dispose();
 
             Random q = new Random();
