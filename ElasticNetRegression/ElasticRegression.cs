@@ -252,7 +252,7 @@ namespace ElasticNetRegression
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
-                double, double, int, int>(
+                double, double, int>(
                 fillX2Kernal);
 
             var subByColumnsKern = this.accelerate.LoadAutoGroupedStreamKernel<
@@ -274,20 +274,6 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView2D<double, Stride2D.DenseX>>(
                 FFillKernal);
-
-            var matrixmulkern = this.accelerate.LoadAutoGroupedStreamKernel<
-                Index1D,
-                ArrayView2D<double, Stride2D.DenseX>,
-                ArrayView1D<double, Stride1D.Dense>,
-                ArrayView1D<double, Stride1D.Dense>>(
-                MatrixMultiplyAcceleratedKernel);
-
-            var matrixmul2dkern = this.accelerate.LoadAutoGroupedStreamKernel<
-                Index2D,
-                ArrayView2D<double, Stride2D.DenseX>,
-                ArrayView2D<double, Stride2D.DenseX>,
-                ArrayView2D<double, Stride2D.DenseX>>(
-                MatrixMultiply2DKernel);
 
             var matrixmulGradphikern = this.accelerate.LoadAutoGroupedStreamKernel<
                 Index1D,
@@ -312,8 +298,7 @@ namespace ElasticNetRegression
             var DualityGapKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
-                double,
-                int>(DualityGapKernal);
+                double>(DualityGapKernal);
 
             var PobjKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -324,12 +309,6 @@ namespace ElasticNetRegression
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>,
                 double>(DobjKernal);
-
-
-            var NormKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
-                ArrayView1D<double, Stride1D.Dense>,
-                ArrayView1D<double, Stride1D.Dense>,
-                int>(NormKernal);
 
             var NewtonStepKern = this.accelerate.LoadAutoGroupedStreamKernel<Index1D,
                 ArrayView1D<double, Stride1D.Dense>,
@@ -488,14 +467,6 @@ namespace ElasticNetRegression
                 ArrayView<double>,
                 int>(SingleSelfDotKernal);
 
-            var sharedMemArrKern = this.accelerate.LoadStreamKernel<
-                ArrayView<double>, 
-                ArrayView<double>>(SharedMemoryArrayKernel);
-
-            var SharedMemoryVariableKern= this.accelerate.LoadStreamKernel<
-                ArrayView<double>,          
-                ArrayView<double>,int,int>(SharedMemoryVariableKerneL); 
-
             var SMSumOfKern = this.accelerate.LoadStreamKernel<
                 ArrayView<double>,          
                 ArrayView<double>,int>(SMSumOfKernal); 
@@ -526,8 +497,8 @@ namespace ElasticNetRegression
                 ArrayView2D<double, Stride2D.DenseX>,
                 ArrayView1D<double, Stride1D.Dense>,
                 ArrayView1D<double, Stride1D.Dense>>(SMMatMul1DKernalTooLarge);
-                
             
+           
             timeonfunction.Stop();
 
 
@@ -599,7 +570,7 @@ namespace ElasticNetRegression
                 columnSTDevKern(this.ColSTDBuffer.Extent.ToIntIndex(), this.XBuffer.View, this.ColSTDBuffer.View, this.ColMeansBuffer.View, X.GetLength(0));
                 
                 //Fill x2
-                x2fillkern(new Index1D(X.GetLength(1)), this.XBuffer.View, this.X2Buffer.View, this.ColMeansBuffer.View, this.ColSTDBuffer.View, c, padding, this.P, X.GetLength(0));
+                x2fillkern(new Index1D(X.GetLength(1)), this.XBuffer.View, this.X2Buffer.View, this.ColMeansBuffer.View, this.ColSTDBuffer.View, c, padding, X.GetLength(0));
                 
                 fillInverseMatrixKern(this.X2Buffer.Extent.ToIntIndex(), this.X2Buffer.View, this.X2TransposeBuffer.View);
                 
@@ -650,7 +621,7 @@ namespace ElasticNetRegression
                     GetMaxValKern(this.MaxValBuffer.Extent.ToIntIndex(), this.XNuBuffer.View, this.MaxValBuffer.View, this.XNuBuffer.Extent.ToIntIndex().X);
 
                     //Calculate the Duality Gap
-                    DualityGapKern(this.NuBuffer.Extent.ToIntIndex(), this.NuBuffer.View, this.MaxValBuffer.View, lambda, this.NuBuffer.Extent.ToIntIndex().X);
+                    DualityGapKern(this.NuBuffer.Extent.ToIntIndex(), this.NuBuffer.View, this.MaxValBuffer.View, lambda);
 
                     //Clear the Dot Product buffers from previous iterations
                     setBuffToValueKern(this.DotProdBufferZxZ.Extent.ToIntIndex(), this.DotProdBufferZxZ.View, 0.0);
@@ -698,7 +669,11 @@ namespace ElasticNetRegression
                     NewtonStepKern(this.UBuffer.Extent.ToIntIndex(), this.UBuffer.View, this.WBuffer.View, this.Q1Buffer.View, this.Q2Buffer.View, this.D1Buffer.View, this.D2Buffer.View, t);
 
                     //Calculate gradient
+                    
                     matrixmulGradphikern(new Index1D(GradphiBuffer.Extent.ToIntIndex().Y), this.X2TransposeBuffer.View, this.ZBuffer.View, this.GradphiBuffer.View);
+
+                    
+
                     GradPhiKern(this.Q1Buffer.Extent.ToIntIndex(), this.GradphiBuffer.View, this.Q1Buffer.View, this.Q2Buffer.View, this.GradBuffer.View, t, lambda, p);
 
                     //Calculate the vectors that are used in the preconditioner
@@ -1126,8 +1101,7 @@ namespace ElasticNetRegression
             if (Group.IsFirstThread)
                 sharedVariable = 0;
                 
-                
-
+        
             Group.Barrier();
             
             if (globalIndex*gridsize + localindex < aView.Length){
@@ -1135,7 +1109,7 @@ namespace ElasticNetRegression
                 Atomic.Add(ref sharedVariable, val);
                 
             }
-           
+            //Have all threads catch up to each other
             Group.Barrier();   
             
             if (Group.IsLastThread){
@@ -1191,92 +1165,23 @@ namespace ElasticNetRegression
             
         }
         
-        static void SharedMemoryArrayKernel(
-            ArrayView<double> dataView,     // A view to a chunk of memory (1D in this case)
-            ArrayView<double> outputView)   // A view to a chunk of memory (1D in this case)
-        {
-            // Compute the global 1D index for accessing the data view
-            int globalIndex = Grid.GlobalIndex.X;
-
-            // Declares a shared-memory array with 128 elements of type int = 4 * 128 = 512 bytes
-            // of shared memory per group
-            // Note that 'Allocate' requires a compile-time known constant array size.
-            // If the size is unknown at compile-time, consider using `GetDynamic`.
-            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
-
-
-            if (Group.IsFirstThread)
-                sharedVariable = 0;
-            // Load the element into shared memory
-            // var value = globalIndex < dataView.Length ?
-            //     dataView[globalIndex] :
-            //     0;
-            // sharedArray[Group.IdxX] = value;
-
-            // Wait for all threads to complete the loading process
-            Group.Barrier();
-            Atomic.Add(ref sharedVariable, dataView[globalIndex]);
-
-            // Compute the sum over all elements in the group
-            // double sum = 0;
-            // for (int i = 0, e = Group.Dimension.X; i < e; ++i)
-            //     sum += sharedArray[i];
-            Group.Barrier();
-            // Store the sum
-            //if (globalIndex < outputView.Length)
-            Atomic.Add(ref outputView[0],  dataView[globalIndex]);
-        }
-        static void SharedMemoryVariableKerneL(
-            ArrayView<double> dataView,          // A view to a chunk of memory (1D in this case)
-            ArrayView<double> outputView,
-            int gridsize, int remainder)        // A view to a chunk of memory (1D in this case)
-        {
-            //Compute the global 1D index for accessing the data view
-            int globalIndex = Grid.LinearIndex;
-            
-            int localindex = Group.LinearIndex;
-
-            // 'Allocate' a single shared memory variable of type int (= 4 bytes)
-            ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
-            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
-            // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
-            // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
-
-            // Initialize shared memory
-            if (Group.IsFirstThread)
-                 sharedVariable = 0;
-                 
-            Group.Barrier();
-            
-            if (globalIndex*gridsize + localindex < dataView.Length){
-                Atomic.Add(ref sharedVariable, dataView[globalIndex*gridsize + localindex]);
-            }
-           
-            Group.Barrier();   
-            
-            if (Group.IsLastThread){
-
-                Atomic.Add(ref outputView[0], sharedVariable);    
-            }   
-           
-
-            
-        }
+        
         static void SMSumOfKernal(
-            ArrayView<double> dataView,          // A view to a chunk of memory (1D in this case)
+            ArrayView<double> dataView,          
             ArrayView<double> outputView,
-            int gridsize)        // A view to a chunk of memory (1D in this case)
+            int gridsize)        
         {
-            //Compute the global 1D index for accessing the data view
+            ///<summary>Calculates the sum of an ArrayView</summary>
+            ///<param name="aView">The ArrayView</param>
+            ///<param name="outputView">The sum</param>
+            ///<param name="gridsize">The number of elements in each grid</param>
+            
             int globalIndex = Grid.LinearIndex;
             
             int localindex = Group.LinearIndex;
 
             // 'Allocate' a single shared memory variable of type int (= 4 bytes)
             ref double sharedVariable = ref ILGPU.SharedMemory.Allocate<double>();
-            // ref int sharedIndex = ref ILGPU.SharedMemory.Allocate<int>();
-            // ref int sharedIndex2 = ref ILGPU.SharedMemory.Allocate<int>();
-            // ref int sharedIndex3 = ref ILGPU.SharedMemory.Allocate<int>();
 
             // Initialize shared memory
             if (Group.IsFirstThread)
@@ -1299,11 +1204,15 @@ namespace ElasticNetRegression
             
         }
         static void SMSumLogNegKernal(
-            ArrayView2D<double, Stride2D.DenseX> dataView,          // A view to a chunk of memory (1D in this case)
+            ArrayView2D<double, Stride2D.DenseX> dataView,          
             ArrayView<double> outputView,
-            int gridsize)        // A view to a chunk of memory (1D in this case)
+            int gridsize)        
         {
-            //Compute the global 1D index for accessing the data view
+            ///<summary>Calculates the sum of the log(-x) of all elements an ArrayView</summary>
+            ///<param name="aView">The ArrayView</param>
+            ///<param name="outputView">The sum</param>
+            ///<param name="gridsize">The number of elements in each grid</param>
+
             int globalIndex = Grid.LinearIndex;
             
             int localindex = Group.LinearIndex;
@@ -1344,6 +1253,13 @@ namespace ElasticNetRegression
             ArrayView1D<int, Stride1D.Dense> output,
             double alpha,
             double s){
+            ///<summary>Used to comp if the newphi has reached a stopping point, set output to 1 if it has</summary>
+            ///<param name="phi">Phi</param>
+            ///<param name="newphi">New Phi</param>
+            ///<param name="gradxDxu">GDX</param>
+            ///<param name="Output">The output</param>
+            ///<param name="alpha">constant</param>
+            ///<param name="s">s value</param>
             if(newphi[index] - phi[index] <= alpha * s * gradxDxu[index]){
                 output[index] = 1;
 
@@ -1351,25 +1267,18 @@ namespace ElasticNetRegression
             else{
                 output[index] = 0;
             }
-            //nphicomp = NewPhiBuffer.GetAsArray1D()[0] - PhiBuffer.GetAsArray1D()[0] <= ALPHA * s * DotProdBufferGradxDXU.GetAsArray1D()[0]
+           
 
-        }
-        static void testKernal(Index1D index,
-            ArrayView1D<double, Stride1D.Dense> aView,
-            double c
-            )
-        {
-            for(int i = 0; i < 1000; i ++){
-                aView[index] += aView[index] * c;
-            }
-            
         }
         static void WFinaleKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> wView,
             ArrayView1D<double, Stride1D.Dense> scale,
             double c
-            )
-        {
+            ){
+            ///<summary>De-Normalizes W after all computations</summary>
+            ///<param name="wView">W Values</param>
+            ///<param name="scale">Std devs of the columns of the data</param>
+            ///<param name="c">variable based on lambda2</param>
             wView[index] = (c * wView[index]) / scale[index];
 
         }
@@ -1378,29 +1287,10 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> zView,
             ArrayView1D<double, Stride1D.Dense> YView)
         {
+            ///<summary>Subtracts the elements of Yview from the corresponding elements in Zview</summary>
+            ///<param name="zView">zView</param>
+            ///<param name="yView">yVuew</param>
             zView[index] = zView[index] - YView[index];
-
-
-        }
-
-        //Not put in yet
-        static void fmaxKernal(Index1D index,
-            ArrayView2D<double, Stride2D.DenseX> fView,
-            ArrayView1D<double, Stride1D.Dense> maxView,
-            int dim1, int dim2)
-        {
-            maxView[index] = fView[new Index2D(0, 0)];
-            for (int i = 0; i < dim1; i++)
-            {
-                for (int j = 0; j < dim2; j++)
-                {
-                    if (maxView[index] < fView[new Index2D(i, j)])
-                    {
-                        maxView[index] = fView[new Index2D(i, j)];
-                    }
-                }
-            }
-
         }
         
         static void CalcphiKernal(Index1D index,
@@ -1410,6 +1300,13 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> fsumlgneg,
             double t, double lambda)
         {
+            ///<summary>Calculates the phi value</summary>
+            ///<param name="phi">phi</param>
+            ///<param name="zdot">zdot</param>
+            ///<param name="usum">usum</param>
+            ///<param name="fsumlgneg">fsumlgneg</param>
+            ///<param name="t">t</param>
+            ///<param name="lambda">lambda</param>
             phi[index] = zdot[index] + lambda * usum[index] - fsumlgneg[index] / t;
 
         }
@@ -1424,6 +1321,17 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> fmax,
             double s)
         {
+            ///<summary>Sets the new values of the w,u, and f buffers. Also switches fmax to positive if there is a positive value in newf</summary>
+            ///<param name="wView">old w buffer</param>
+            ///<param name="uView">old u buffer</param>
+            ///<param name="dxView">dx buffer, used for calculations</param>
+            ///<param name="duView">du buffer, used for calculations</param>
+            ///<param name="newwView">the new w buffer</param>
+            ///<param name="newuView">the new u buffer</param>
+            ///<param name="newfView">the new f buffer</param>
+            ///<param name="fmax">fmax</param>
+            ///<param name="s">s</param>
+            
             newwView[index] = wView[index] + s * dxView[index];
             newuView[index] = uView[index] + s * duView[index];
             newfView[new Index2D(0, index.X)] = newwView[index] - newuView[index];
@@ -1434,30 +1342,18 @@ namespace ElasticNetRegression
 
         }
 
-        //Need to implement
-        //Above not initialized yet
-        static void sumlognegKernal(Index1D index,
-            ArrayView2D<double, Stride2D.DenseX> fView,
-            ArrayView1D<double, Stride1D.Dense> sumView,
-            int dim1, int dim2)
-        {
-            for (int i = 0; i < dim1; i++)
-            {
-                for (int j = 0; j < dim2; j++)
-                {     
-                    sumView[index] +=Math.Log(-fView[new Index2D(i, j)]);
-
-                }
-            }
-
-        }
-
+        
         static void splitDXUKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> dxView,
             ArrayView1D<double, Stride1D.Dense> duView,
             ArrayView1D<double, Stride1D.Dense> dxuView,
             int p)
         {
+            ///<summary>Fills DX and DU with the front and back halves of dxu respectively</summary>
+            ///<param name="dxView">dx</param>
+            ///<param name="duView">du</param>
+            ///<param name="dxuView">dxu</param>
+            ///<param name="p">length of dx</param>
             dxView[index] = dxuView[index];
             duView[index] = dxuView[new Index1D(index.X + p)];
 
@@ -1468,6 +1364,10 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> error
             )
         {
+            ///<summary>Calculates the error from rnorm and bnorm</summary>
+            ///<param name="rnorm">rnorm</param>
+            ///<param name="bnorm">bnorm</param>
+            ///<param name="error">error</param>
             error[index] = rnorm[index] / bnorm[index];
 
         }
@@ -1482,6 +1382,16 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> xView,
             ArrayView1D<double, Stride1D.Dense> pView)
         {
+            ///<summary>Adjusts the rView, rrView, and xView</summary>
+            ///<param name="rView">rView</param>
+            ///<param name="rrView">rrView</param>
+            ///<param name="zView">zView</param>
+            ///<param name="zzView">zzView</param>
+            ///<param name="bknumView">bknumView</param>
+            ///<param name="akdenView">akdenView</param>
+            ///<param name="xView">xView</param>
+            ///<param name="pView">pView</param>
+            
             rView[index] -= (bknumView[new Index1D(0)] / akdenView[new Index1D(0)]) * zView[index];
             rrView[index] -= (bknumView[new Index1D(0)] / akdenView[new Index1D(0)]) * zzView[index];
             xView[index] += (bknumView[new Index1D(0)] / akdenView[new Index1D(0)]) * pView[index];
@@ -1491,7 +1401,11 @@ namespace ElasticNetRegression
         static void CopyBufferKernal1D(Index1D index,
             ArrayView1D<double, Stride1D.Dense> aView,
             ArrayView1D<double, Stride1D.Dense> bView)
+
         {
+            ///<summary>Copys aView into Bview</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
             bView[index] = aView[index];
 
         }
@@ -1499,21 +1413,10 @@ namespace ElasticNetRegression
             ArrayView2D<double, Stride2D.DenseX> aView,
             ArrayView2D<double, Stride2D.DenseX> bView)
         {
+            ///<summary>Copys aView into Bview</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
             bView[index] = aView[index];
-
-        }
-
-        //The two use the same
-        static void BKNUM_AKDENKernal(Index1D index,
-            ArrayView1D<double, Stride1D.Dense> bknumView,
-            ArrayView1D<double, Stride1D.Dense> rrView,
-            ArrayView1D<double, Stride1D.Dense> zView,
-            int n)
-        {
-            for (int i = 0; i < n; i++)
-            {
-                bknumView[index] += zView[new Index1D(i)] * rrView[new Index1D(i)];
-            }
 
         }
 
@@ -1523,6 +1426,11 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> zView,
             ArrayView1D<double, Stride1D.Dense> zzView)
         {
+            ///<summary>Fills p with z and pp with zz</summary>
+            ///<param name="pView">pView</param>
+            ///<param name="ppView">ppView</param>
+            ///<param name="zView">zView</param>
+            ///<param name="zzView">zzView</param>
             pView[index] = zView[index];
             ppView[index] = zzView[index];
 
@@ -1536,6 +1444,13 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> bknumView,
             ArrayView1D<double, Stride1D.Dense> bkdenView)
         {
+            ///<summary>Adjusts the pView and ppView</summary>
+            ///<param name="pView">pView</param>
+            ///<param name="ppView">ppView</param>
+            ///<param name="zView">zView</param>
+            ///<param name="zzView">zzView</param>
+            ///<param name="bknumView">bknumView</param>
+            ///<param name="bkdenView">bkdenView</param>
 
             pView[index] = ((bknumView[new Index1D(0)] / bkdenView[new Index1D(0)]) * pView[index]) + zView[index];
             ppView[index] = ((bknumView[new Index1D(0)] / bkdenView[new Index1D(0)]) * ppView[index]) + zzView[index];
@@ -1547,8 +1462,11 @@ namespace ElasticNetRegression
             ArrayView2D<double, Stride2D.DenseX> aView,
             ArrayView2D<double, Stride2D.DenseX> inverseView)
         {
-            inverseView[new Index2D(index.Y, index.X)] = aView[index];
+            ///<summary>Fills p with z and pp with zz</summary>
+            ///<param name="pView">pView</param>
+            ///<param name="ppView">ppView</param>
 
+            inverseView[new Index2D(index.Y, index.X)] = aView[index];
         }
         static void PCGasolveKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> bView,
@@ -1560,6 +1478,15 @@ namespace ElasticNetRegression
             int p
             )
         {
+            ///<summary>Asolve algorithm, adjusts xView</summary>
+            ///<param name="bView">bView</param>
+            ///<param name="xView">xView</param>
+            ///<param name="d1View">d1View</param>
+            ///<param name="d2View">d2View</param>
+            ///<param name="prsView">prsView</param>
+            ///<param name="prbView">prbView</param>
+            ///<param name="p"> half of length of xView</param>
+            
             xView[index] = ((d1View[index] * bView[index]) - (d2View[index] * bView[new Index1D(index.X + p)])) / prsView[index];
             xView[new Index1D(index.X + p)] = ((-d2View[index] * bView[index]) + (prbView[index] * bView[new Index1D(index.X + p)])) / prsView[index];
 
@@ -1570,9 +1497,15 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> rrView
             )
         {
+            ///<summary>Fills r and rr using bView</summary>
+            ///<param name="bView">bView</param>
+            ///<param name="rView">rView</param>
+            ///<param name="rrView">rrView</param>
+
             rView[index] = bView[index] - rView[index];
             rrView[index] = rView[index];
         }
+
         //need to initialize ata first, and matrix multiply by AtA x x -> atax
         //Index needs to be passed as p (aka 1/2 of the len of xView)
         static void PCGmvKernal(Index1D index,
@@ -1584,37 +1517,23 @@ namespace ElasticNetRegression
             int p
             )
         {
+            ///<summary>Mv algo that replaces matrix multiplication in PCG algo</summary>
+            ///<param name="ataxView">ataxView</param>
+            ///<param name="xView">xView</param>
+            ///<param name="yView">yView</param>
+            ///<param name="d1View">d1View</param>
+            ///<param name="d2View">d2View</param>
+            ///<param name="p">half of length of yView</param>
+
             int z = index.X;
-            //Issue here, idk why
+           
             yView[index] = (2.0 * ataxView[index]) + (d1View[index] * xView[index]) + (d2View[index] * xView[new Index1D(index.X + p)]);
             yView[new Index1D(index.X + p)] = (d2View[index] * xView[index]) + (d1View[index] * xView[new Index1D(index.X + p)]);
 
 
 
         }
-        static void GradPhiAndPreconditionerKernal(Index1D index,
-            ArrayView2D<double, Stride2D.DenseX> GradPhiView,
-            ArrayView1D<double, Stride1D.Dense> q1View,
-            ArrayView1D<double, Stride1D.Dense> q2View,
-            ArrayView1D<double, Stride1D.Dense> gradView,
-            double t,
-            double lambda,
-            int p,
-            ArrayView1D<double, Stride1D.Dense> prbView,
-            ArrayView1D<double, Stride1D.Dense> prsView,
-            ArrayView1D<double, Stride1D.Dense> d1View,
-            ArrayView1D<double, Stride1D.Dense> d2View,
-            ArrayView1D<double, Stride1D.Dense> diagxtxView
-            )
-        {
-            GradPhiView[new Index2D(0, index.X)] = (2.0 * GradPhiView[new Index2D(0, index.X)]) - ((q1View[index] - q2View[index]) / t);
-            GradPhiView[new Index2D(1, index.X)] = lambda - (q1View[index] + q2View[index]) / t;//
-            gradView[index] = -1.0 * GradPhiView[new Index2D(0, index.X)];
-            gradView[new Index1D(index.X + p)] = -1.0 * GradPhiView[new Index2D(1, index.X)];
-            prbView[index] = diagxtxView[index] + d1View[index];
-            prsView[index] = (prbView[index] * d1View[index]) - (d2View[index] * d2View[index]);
-
-        }
+        
         static void PreconditionerVectorKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> prbView,
             ArrayView1D<double, Stride1D.Dense> prsView,
@@ -1622,6 +1541,12 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> d2View,
             ArrayView1D<double, Stride1D.Dense> diagxtxView)
         {
+            ///<summary>Calculates preconditioner vector variables</summary>
+            ///<param name="prbView">prbView</param>
+            ///<param name="prsView">prsView</param>
+            ///<param name="d1View">d1View</param>
+            ///<param name="d2View">d2View</param>
+            ///<param name="diagxtxView">diagxtxView</param>
             prbView[index] = diagxtxView[index] + d1View[index];
             prsView[index] = (prbView[index] * d1View[index]) - (d2View[index] * d2View[index]);
 
@@ -1636,28 +1561,21 @@ namespace ElasticNetRegression
             int p
             )
         {
+            ///<summary>Calculates gradient</summary>
+            ///<param name="GradPhiView">GradPhiView</param>
+            ///<param name="q1View">q1View</param>
+            ///<param name="q2View">q2View</param>
+            ///<param name="gradView">gradView</param>
+            ///<param name="t">t variable</param>
+            ///<param name="lambda">lambda variable</param>
+            ///<param name="p">length of half of gradview</param>
             GradPhiView[new Index2D(0, index.X)] = (2.0 * GradPhiView[new Index2D(0, index.X)]) - ((q1View[index] - q2View[index]) / t);
             GradPhiView[new Index2D(1, index.X)] = lambda - (q1View[index] + q2View[index]) / t;//
             gradView[index] = -1.0 * GradPhiView[new Index2D(0, index.X)];
             gradView[new Index1D(index.X + p)] = -1.0 * GradPhiView[new Index2D(1, index.X)];
 
         }
-        static void sumofkernal(Index1D index, ArrayView1D<double, Stride1D.Dense> aView, ArrayView1D<double, Stride1D.Dense> sum, int dim1)
-        {
-            ///<summary>Adds up everything in a 2DBuffer.</summary>
-            ///<param name="index">(Index1D) Index to iterate through the array</param>
-            ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer to be added up</param>
-            ///<param name="sum">(ArrayView1D<double, Stride1D.Dense>) Buffer for the sum</param>
-            ///<param name="dim1">(int) First dimension of aView</param>
-            ///<param name="dim2">(int) Second dimension of aView</param>
-            for (int i = 0; i < dim1; i++)
-            {
-
-                sum[index] += aView[new Index1D(i)];
-
-            }
-            //Atomic.Add(ref sum[new Index1D(0)], aView[index]); 
-        }
+        
         static void NewtonStepKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> uView,
             ArrayView1D<double, Stride1D.Dense> wView,
@@ -1667,6 +1585,15 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> d2View,
             double t)
         {
+            ///<summary>Calculates newton step</summary>
+            ///<param name="uView">uView</param>
+            ///<param name="wView">wView</param>
+            ///<param name="q1View">q1View</param>
+            ///<param name="q2View">q2View</param>
+            ///<param name="d1View">d1View</param>
+            ///<param name="d2View">d2View</param>
+            ///<param name="t">t variable</param>
+
             double q1i = 1.0 / (uView[index] + wView[index]);
             double q2i = 1.0 / (uView[index] - wView[index]);
             q1View[index] = q1i;
@@ -1679,9 +1606,13 @@ namespace ElasticNetRegression
         static void DualityGapKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> NuView,
             ArrayView1D<double, Stride1D.Dense> MaxXnu,
-            double lambda,
-            int NuLength)
+            double lambda)
         {
+            ///<summary>Calculates duality gap</summary>
+            ///<param name="NuView">NuView</param>
+            ///<param name="MaxXnu">MaxXnu</param>
+            ///<param name="lambda">lambda</param>
+            
             double mxxnu = MaxXnu[new Index1D(0)];
 
             if (mxxnu > lambda)
@@ -1692,78 +1623,28 @@ namespace ElasticNetRegression
             }
 
         }
-        static void DotKernal(Index1D index,
-            ArrayView1D<double, Stride1D.Dense> aView,
-            ArrayView1D<double, Stride1D.Dense> bView,
-            ArrayView1D<double, Stride1D.Dense> Output,
-            int length
-            )
-        {
-            for (int i = 0; i < length; i++)
-            {
-                Output[index] += aView[new Index1D(i)] * bView[new Index1D(i)];
-            }
-
-        }
-        static void DotSelfKernal(Index1D index,
-            ArrayView1D<double, Stride1D.Dense> aView,
-            ArrayView1D<double, Stride1D.Dense> Output,
-            int length
-            )
-        {
-            for (int i = 0; i < length; i++)
-            {
-                Output[index] += aView[new Index1D(i)] * aView[new Index1D(i)];
-            }
-
-        }
+        
+        
         static void sqrtkernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> aView)
         {
+            ///<summary>Calculates the sqrt of all values in a buffer</summary>
+            ///<param name="aView">aView</param>
+
             aView[index] = Math.Sqrt(aView[index]);
         }
-        static void NormKernal(Index1D index,
-            ArrayView1D<double, Stride1D.Dense> aView,
-            ArrayView1D<double, Stride1D.Dense> output,
-            int length
-            )
-        {
-            for (int i = 0; i < length; i++)
-            {
-
-                output[index] += Math.Abs(aView[new Index1D(i)]);
-            }
-
-        }
-        static void Norm2Kernal(Index1D index,
-            ArrayView1D<double, Stride1D.Dense> aView,
-            ArrayView1D<double, Stride1D.Dense> output,
-            int length
-            )
-        {
-            double sum = 0.0;
-            for (int i = 0; i < length; i++)
-            {
-                sum += aView[new Index1D(i)] * aView[new Index1D(i)];
-            }
-            output[index] = Math.Sqrt(sum);
-
-        }
-        static double Norm2NOGPU(double[] arr)
-        {
-            double sum = 0.0;
-            for (int i = 0; i < arr.GetLength(0); i++)
-            {
-                sum += arr[i] * arr[i];
-            }
-            return Math.Sqrt(sum);
-
-        }
+        
+    
         static void PobjKernal(Index1D index,
             ArrayView1D<double, Stride1D.Dense> dot,
             ArrayView1D<double, Stride1D.Dense> norm1,
             double l)
         {
+            ///<summary>Calculates primal objective function value</summary>
+            ///<param name="dot">dot</param>
+            ///<param name="norm1">norm1 input, and used as output to save space</param>
+            ///<param name="l">lamda</param>
+
             norm1[index] = dot[index] + (l * norm1[index]);
 
         }
@@ -1772,6 +1653,11 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> dot2,
             double dobj)
         {
+            ///<summary>Calculates dual objective function value</summary>
+            ///<param name="dot1">dot1 value and output to save space</param>
+            ///<param name="dot2">dot2</param>
+            ///<param name="dobj">previous dobj value</param>
+            
             dot1[index] = Math.Max((-0.25 * dot1[index]) - dot2[index], dobj);
 
         }
@@ -1781,6 +1667,10 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> zView,
             ArrayView1D<double, Stride1D.Dense> NuView)
         {
+            ///<summary>Initializes Nu Buffer, and adjusts z based on Y</summary>
+            ///<param name="YView">YView</param>
+            ///<param name="zView">zView</param>
+            ///<param name="NuView">NuView</param>
             zView[index] = zView[index] - YView[index];
             NuView[index] = 2.0 * zView[index];
 
@@ -1791,7 +1681,13 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> MaxVal,
             int aViewLength)
         {
+            ///<summary>Gets the maximum value of aView</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="MaxVal">MaxVal</param>
+            ///<param name="aViewLength">length of aView</param>
+
             MaxVal[index] = Math.Abs(aView[new Index1D(0)]);
+
             for (int i = 0; i < aViewLength; i++)
             {
                 if (Math.Abs(aView[new Index1D(i)]) > MaxVal[index])
@@ -1808,7 +1704,10 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> wView,
             ArrayView2D<double, Stride2D.DenseX> fView)
         {
-
+            ///<summary>Fills the f buffer</summary>
+            ///<param name="uView">uView</param>
+            ///<param name="wView">wView</param>
+            ///<param name="fView">fView</param>
             Index2D ind1 = new Index2D(0, index.X);
             Index2D ind2 = new Index2D(1, index.X);
             fView[ind1] = wView[index] - uView[index];
@@ -1822,6 +1721,10 @@ namespace ElasticNetRegression
             int y
             )
         {
+            ///<summary>Gets the means of all the columns in aView</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="y">the length of the columns</param>
             double sum = 0.0;
             for (int i = 0; i < y; i++)
             {
@@ -1836,6 +1739,11 @@ namespace ElasticNetRegression
             int y
             )
         {
+            ///<summary>Gets the means of all the columns in aView</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="y">the length of the columns</param>
+
             double sum = 0.0;
             for (int i = 0; i < y; i++)
             {
@@ -1848,12 +1756,12 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> bView,
             ArrayView1D<double, Stride1D.Dense> meanView)
         {
-            //Index1D ind2d;
-            // for (int i = 0; i < n; i++)
-            // {
-             //   ind2d = new Index1D(i);
+            ///<summary>Subtracts every element in aView by the mean of aView</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="meanView">the mean of aView</param>
             bView[index] = aView[index] - meanView[new Index1D(0)];
-            //}
+           
         }
         static void columnSTDevKernal(
             Index1D index,
@@ -1863,6 +1771,11 @@ namespace ElasticNetRegression
             int y
             )
         {
+            ///<summary>Gets the std deviations of all the columns in aView</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="meanView">meanView</param>
+            ///<param name="y">the length of the columns</param>
             double sum = 0.0;
             double val;
             for (int i = 0; i < y; i++)
@@ -1880,10 +1793,18 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> colSTDs,
             double c,
             double padding,
-            int n,
             int m
             )
         {
+            ///<summary>Fills X2 Buffer</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="colMeans">colMeans</param>
+            ///<param name="colSTDs">colSTDs</param>
+            ///<param name="c">C</param>
+            ///<param name="padding">padding</param>
+            ///<param name="m">length of aView</param>
+            
             for (int i = 0; i < m; i++)
             {
                 bView[new Index2D(i, index.X)] = c * (aView[new Index2D(i, index.X)] - colMeans[index]) / colSTDs[index];
@@ -1899,52 +1820,22 @@ namespace ElasticNetRegression
             double subvalue
             )
         {
+            ///<summary>Subtracts subvalue from every element of aView and puts result into BView</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="subvalue">subvalue</param>
             bView[index] = aView[index] - subvalue;
         }
-        static void MatrixMultiplyAcceleratedKernel(
-            Index1D index,
-            ArrayView2D<double, Stride2D.DenseX> aView,
-            ArrayView1D<double, Stride1D.Dense> bView,
-            ArrayView1D<double, Stride1D.Dense> cView)
-        {
-            ///<summary> Does Matrix Multiplication on two arrayviews, and then stores in a new arrayview </summary>
-            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-            ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) 1st ArrayView being multiplied</param>
-            ///<param name="bView">(ArrayView2D<double, Stride2D.DenseX>) 2nd ArrayView being multiplied</param>
-            ///<param name="cView">(ArrayView2D<double, Stride2D.DenseX>) Buffer where new value goes</param>
-            var x = index.X;
-            //var y = index.Y;
-            double sum = 0.0;
-            for (var i = 0; i < aView.Extent.ToIntIndex().Y; i++){
-                sum += aView[new Index2D(x, i)] * bView[new Index1D(i)];
-            }
+        
 
-            cView[index] = sum;
-        }
-        static void MatrixMultiply2DKernel(
-            Index2D index,
-            ArrayView2D<double, Stride2D.DenseX> aView,
-            ArrayView2D<double, Stride2D.DenseX> bView,
-            ArrayView2D<double, Stride2D.DenseX> cView)
-        {
-            ///<summary> Does Matrix Multiplication on two arrayviews, and then stores in a new arrayview </summary>
-            ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-            ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) 1st ArrayView being multiplied</param>
-            ///<param name="bView">(ArrayView2D<double, Stride2D.DenseX>) 2nd ArrayView being multiplied</param>
-            ///<param name="cView">(ArrayView2D<double, Stride2D.DenseX>) Buffer where new value goes</param>
-            var x = index.X;
-            var y = index.Y;
-            double sum = 0.0;
-            for (var i = 0; i < aView.IntExtent.Y; i++)
-                sum += aView[new Index2D(x, i)] * bView[new Index2D(i, y)];
-
-            cView[index] = sum;
-        }
         static void SMMatMul2DKernal(Index3D index,
             ArrayView2D<double, Stride2D.DenseX> aView,
             ArrayView2D<double, Stride2D.DenseX> bView,
             ArrayView2D<double, Stride2D.DenseX> cView){
-
+            ///<summary>Does matrix multiplication between two 2d arrays</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="cView">output</param>
             var x = index.X;
             var y = index.Y;
             var z = index.Z;
@@ -1957,28 +1848,34 @@ namespace ElasticNetRegression
             ArrayView2D<double, Stride2D.DenseX> aView,
             ArrayView1D<double, Stride1D.Dense> bView,
             ArrayView1D<double, Stride1D.Dense> cView){
-
+            ///<summary>Does matrix multiplication between a 2d and a 1d array</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="cView">output</param>
             var x = index.X;
             var y = index.Y;
             
             
             double val = aView[new Index2D(x,y)] * bView[new Index1D(y)];
-            //Group.Barrier();
             Atomic.Add(ref cView[new Index1D(x)], val);
 
 
         }
+        
         static void SMMatMul1DKernalTooLarge(Index2D index,
             ArrayView2D<double, Stride2D.DenseX> aView,
             ArrayView1D<double, Stride1D.Dense> bView,
             ArrayView1D<double, Stride1D.Dense> cView){
+            ///<summary>Does matrix multiplication between a 2d and a 1d array, but adjusted for when aview dimensions are too large</summary>
+            ///<param name="aView">aView</param>
+            ///<param name="bView">bView</param>
+            ///<param name="cView">output</param>
 
             var x = index.X;
             var y = index.Y;
             
             
             double val = aView[new Index2D(y,x)] * bView[new Index1D(x)];
-            //Group.Barrier();
             Atomic.Add(ref cView[new Index1D(y)], val);
 
 
@@ -1989,7 +1886,7 @@ namespace ElasticNetRegression
             ArrayView1D<double, Stride1D.Dense> bView,
             ArrayView2D<double, Stride2D.DenseX> cView)
         {
-            ///<summary> Does Matrix Multiplication on two arrayviews, and then stores in a new arrayview </summary>
+            ///<summary> Does Matrix Multiplication on two arrayviews, and then stores in gradphi </summary>
             ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
             ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) 1st ArrayView being multiplied</param>
             ///<param name="bView">(ArrayView2D<double, Stride2D.DenseX>) 2nd ArrayView being multiplied</param>
@@ -2002,10 +1899,60 @@ namespace ElasticNetRegression
 
             cView[new Index2D(0, x)] = sum;
         }
-        static void setBuffToValueKernal(Index1D index, ArrayView1D<double, Stride1D.Dense> buff, double setvalue)
+
+        static void setBuffToValueKernal(Index1D index, 
+            ArrayView1D<double, Stride1D.Dense> buff, 
+            double setvalue)
         {
+            ///<summary>Sets every element in buff to setvalue</summary>
+            ///<param name="buff">buff</param>
+            ///<param name="setvalue">setvalue</param>
             buff[index] = setvalue;
         }
+        
+        public double[] predict(double[,] x)
+            ///<summary>Predicts output based off of x</summary>
+            ///<param name="x">Array of inputs</param>
+        { 
+            //return applyadd(matrixmul(x, this.W), this.B);
+            return applyadd(matrixmul(x, this.W), this.B);
+        }
+        double[] applyadd(double[] arr, double val)
+        ///<summary>Adds a value to each member of a 2d array</summary>
+        {
+            double[] temp = new double[arr.GetLength(0)];
+            for (int i = 0; i < arr.GetLength(0); i++)
+            {
+            
+                temp[i] = arr[i] + val;
+                
+            }
+            return temp;
+
+        }
+        double[] matrixmul(double[,] x, double[] y)
+        {
+            ///<summary>Does matrix multiplication on two 2d arrays</summary>
+            ///<param name="x">Array 1</param>
+            ///<param name="y">Array 2</param>
+
+
+            //Initialize all varaibles
+            int m = x.GetLength(0), n = x.GetLength(1), p = y.GetLength(0);
+
+            /////Create empty array of new size
+            double[] c = new double[m];
+
+            //double sum = 0.0;
+            for(int i = 0; i < m; i++){
+                //sum = 0.0;
+                for(int j = 0; j< n; j++){
+                    c[i] += x[i,j] * y[j]; 
+                }
+            }
+            return c;
+        }
+        //TEST FUNCTIONS BELOW
         void print2d(double[,] array)
         {
             Console.WriteLine(array);
@@ -2054,573 +2001,6 @@ namespace ElasticNetRegression
             Console.WriteLine("]");
 
         }
-        public double[] predict(double[,] x)
-            ///<summary>Predicts output based off of x</summary>
-            ///<param name="x">Array of inputs</param>
-        { 
-            //return applyadd(matrixmul(x, this.W), this.B);
-            return applyadd(matrixmul(x, this.W), this.B);
-        }
-        double[] applyadd(double[] arr, double val)
-        ///<summary>Adds a value to each member of a 2d array</summary>
-        {
-            double[] temp = new double[arr.GetLength(0)];
-            for (int i = 0; i < arr.GetLength(0); i++)
-            {
-            
-                temp[i] = arr[i] + val;
-                
-            }
-            return temp;
-
-        }
-        double[] matrixmul(double[,] x, double[] y)
-        {
-            ///<summary>Does matrix multiplication on two 2d arrays</summary>
-            ///<param name="x">Array 1</param>
-            ///<param name="y">Array 2</param>
-
-
-            //Initialize all varaibles
-            int m = x.GetLength(0), n = x.GetLength(1), p = y.GetLength(0);
-
-            /////Create empty array of new size
-            double[] c = new double[m];
-
-            //double sum = 0.0;
-            for(int i = 0; i < m; i++){
-                //sum = 0.0;
-                for(int j = 0; j< n; j++){
-                    c[i] += x[i,j] * y[j]; 
-                }
-            }
-            return c;
-        }
-    // }
-
-
-
-
-    // public class ElasticRegression
-    // {
-    //     int Iterations;
-    //     int M;
-    //     int N;
-    //     int Q;
-
-    //     double Learning_rate;
-    //     double L1_penality;
-    //     double L2_penality;
-    //     double B;
-
-    //     double[,] W;
-    //     double[,] X;
-    //     double[,] Y;
-
-    //     //Memory Buffers Used in GPU computations
-    //     MemoryBuffer2D<double, Stride2D.DenseX> XBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> YBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> WBuffer;
-    //     MemoryBuffer1D<double, Stride1D.Dense> SumBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> MatMulBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> PredMatMulBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> dWBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> YDiffBuffer;
-    //     MemoryBuffer2D<double, Stride2D.DenseX> YPredBuffer;
-
-    //     //Different Kernals needed for GPU computations
-    //     Action<Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>> subtwoarrkern;
-    //     Action<Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>> subtwoarrkern2;
-    //     Action<Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>> matrixmulkern;
-    //     Action<Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             double, double, double> updatekernel;
-    //     Action<Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             double> matrixaddkern;
-    //     Action<Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             double> matrixmulsinglekern;
-    //     Action<Index1D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView1D<double, Stride1D.Dense>,
-    //             int, int> sumofkern;
-    //     Action<Index1D,
-    //             ArrayView1D<double, Stride1D.Dense>> clearsumkern;
-
-
-
-
-    //     Device dev;
-    //     Accelerator accelerate;
-
-    //     //Will be used later when optimized for GPU use
-    //     Context context;
-
-
-    //     /////      Constructor
-    //     public ElasticRegression(double learning_rate, int iterations, double l1_penality, double l2_penality, bool fullGPU = false)
-    //     {
-    //         ///<summary>Constructor for ElasticRegression object</summary>
-    //         ///<param name="learning_rate">(double) learning rate of the regression</param>
-    //         ///<param name="iterations">(int) How many iterations of the algorithm will run when the model is fit</param>
-    //         ///<param name="l1_penality">(double )L1 penality</param>
-    //         ///<param name="l2_penality">(double )L2 penality</param>
-
-
-
-
-    //         this.Learning_rate = learning_rate;
-
-    //         this.Iterations = iterations;
-
-    //         this.L1_penality = l1_penality;
-
-    //         this.L2_penality = l2_penality;
-    //         this.context = Context.Create(builder => builder.Default());//builder => builder.Default().EnableAlgorithms())
-    //         this.dev = this.context.GetPreferredDevice(preferCPU: false);
-
-    //     }
-
-    //     public ElasticRegression fitFULLGPU(double[,] X, double[,] Y, bool verbose = true)
-    //     {
-    //         ///<summary>Trains the model</summary>
-    //         ///<param name="X">(double[,]) A 2d array of the inputs to be trained on.</param>
-    //         ///<param name="Y">(double[,]) A 2d array of the target outputs, must have same length as X</param>
-    //         ///<param name="verbose">(boolean) Determines if the program outputs updates as it runs, default = true</param>
-
-
-    //         //Number of training examples
-    //         this.M = X.GetLength(0) * X.GetLength(1);
-    //         //Number of features
-    //         this.N = X.GetLength(1);
-
-    //         //Initializes accelerator
-    //         this.accelerate = this.dev.CreateAccelerator(this.context);
-
-    //         //Initialize Kernels for use with the GPU
-    //         this.subtwoarrkern = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>>(
-    //             subtwoarrsKernal);
-    //         this.subtwoarrkern2 = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>>(
-    //             subtwoarrsKernal2);
-    //         this.matrixmulsinglekern = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             double>(
-    //             multKernal);
-    //         this.matrixaddkern = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             double>(
-    //             additionKernal);
-    //         this.matrixmulkern = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>>(
-    //             MatrixMultiplyAcceleratedKernel);
-    //         this.updatekernel = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             double, double, double>(
-    //             updateweightskernal);
-    //         this.sumofkern = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index1D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView1D<double, Stride1D.Dense>,
-    //             int, int>(sumofkernal);
-    //         this.clearsumkern = this.accelerate.LoadAutoGroupedStreamKernel<
-    //             Index1D,
-    //             ArrayView1D<double, Stride1D.Dense>>(clearsumbuff);
-
-
-    //         //Number of outputs
-    //         this.Q = Y.GetLength(1);
-
-    //         //Initializes variables
-    //         //The weights of the model
-    //         this.W = new double[this.N, this.Q];
-
-    //         //Buffer to store the weights during GPU running
-    //         this.WBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(this.N, this.Q));
-
-    //         //Buffer to store the temporary weight changes
-    //         this.dWBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(this.N, this.Q));
-
-
-    //         this.B = 0.0;
-
-
-    //         //Initializes the buffer for training data features
-    //         this.X = X;
-    //         this.XBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(X.GetLength(0), X.GetLength(1)));
-    //         XBuffer.CopyFromCPU(this.X);
-
-    //         //Initializes the buffer for training data outputs
-    //         this.Y = Y;
-    //         this.YBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(Y.GetLength(0), Y.GetLength(1)));
-    //         YBuffer.CopyFromCPU(this.Y);
-
-
-    //         //Buffers for working with prediction and diff of Y
-    //         this.YPredBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(Y.GetLength(0), Y.GetLength(1)));
-    //         this.YDiffBuffer = this.accelerate.Allocate2DDenseX<double>(new Index2D(Y.GetLength(1), Y.GetLength(0)));
-
-    //         //Buffers used for matrix multiplication
-    //         this.MatMulBuffer = accelerate.Allocate2DDenseX<double>(new Index2D(Y.GetLength(1), X.GetLength(1)));
-    //         this.PredMatMulBuffer = accelerate.Allocate2DDenseX<double>(new Index2D(X.GetLength(0), this.Q));
-
-    //         //Helper buffer to calculate the sum of the YDiffBuffer
-    //         this.SumBuffer = accelerate.Allocate1D<double>(1L);
-
-    //         double db = 0.0;
-
-    //         //Gradient descent learning
-
-
-    //         //Using Buffers in order to edit them on each iteration
-    //         using (this.YBuffer)
-    //         using (this.YPredBuffer)
-    //         using (this.YDiffBuffer)
-    //         using (this.MatMulBuffer)
-    //         using (this.XBuffer)
-    //         using (this.WBuffer)
-    //         using (this.dWBuffer)
-    //         using (this.SumBuffer)
-    //         using (this.accelerate)
-    //         {
-    //             for (int i = 0; i < this.Iterations; i++)
-    //             {
-    //                 if (verbose)
-    //                 {
-    //                     Console.WriteLine("Iteration {0}/{1}", i, this.Iterations);
-    //                 }
-
-    //                 //Gets the prediction based on the WBuffer
-    //                 this.matrixmulkern(this.YPredBuffer.Extent.ToIntIndex(), this.XBuffer, this.WBuffer, this.YPredBuffer);
-    //                 this.matrixaddkern(this.YPredBuffer.Extent.ToIntIndex(), this.YPredBuffer, this.B);
-
-
-    //                 //Gets the difference between YActual and YPrediction and puts it in YDiffBuffer
-    //                 this.subtwoarrkern(this.YBuffer.Extent.ToIntIndex(), this.YBuffer, this.YPredBuffer, this.YDiffBuffer);
-
-    //                 //Multiply error by the actual xbuffer
-    //                 this.matrixmulkern(this.MatMulBuffer.Extent.ToIntIndex(), this.YDiffBuffer, this.XBuffer, this.MatMulBuffer);
-
-
-    //                 //Update dWbuffer
-    //                 this.updatekernel(this.WBuffer.Extent.ToIntIndex(), this.WBuffer.View, this.MatMulBuffer.View, this.dWBuffer.View, this.L1_penality, this.L2_penality, this.M);
-
-    //                 //Set Sumbuffer to 0
-    //                 this.clearsumkern(this.SumBuffer.Extent.ToIntIndex(), this.SumBuffer.View);
-
-    //                 //Get the sum of YDiff Buffer
-    //                 this.sumofkern(this.SumBuffer.Extent.ToIntIndex(), this.YDiffBuffer.View, this.SumBuffer.View, this.YDiffBuffer.Extent.ToIntIndex().X, this.YDiffBuffer.Extent.ToIntIndex().Y);
-
-
-    //                 db = (-2.0 * this.SumBuffer.GetAsArray1D()[0]) / this.M;
-
-    //                 //Multiply dWBuffer by the learning rate
-    //                 this.matrixmulsinglekern(this.dWBuffer.Extent.ToIntIndex(), this.dWBuffer, this.Learning_rate);
-
-    //                 //Sub the dWBuffer from the WBuffer
-    //                 this.subtwoarrkern2(this.WBuffer.Extent.ToIntIndex(), this.WBuffer, this.dWBuffer);
-
-    //                 this.B = this.B - (this.Learning_rate * db);
-
-    //             }
-    //             //Move the weights out of GPU to be used for predictions
-    //             this.W = this.WBuffer.GetAsArray2D();
-    //         }
-
-    //         this.accelerate.Dispose();
-    //         return this;
-    //     }
-
-    //     static void clearsumbuff(Index1D index, ArrayView1D<double, Stride1D.Dense> sum)
-    //     {
-    //         ///<summary>Sets the sumbuffer to 0</summary>
-    //         ///<param name="index">(Index1D) Index to iterate through the array</param>
-    //         ///<param name="sum">(ArrayView1D<double, Stride1D.Dense>) Buffer</param>
-    //         sum[index] = 0.0;
-    //     }
-    //     static void sumofkernal(Index1D index, ArrayView2D<double, Stride2D.DenseX> aView, ArrayView1D<double, Stride1D.Dense> sum, int dim1, int dim2)
-    //     {
-    //         ///<summary>Adds up everything in a 2DBuffer.</summary>
-    //         ///<param name="index">(Index1D) Index to iterate through the array</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer to be added up</param>
-    //         ///<param name="sum">(ArrayView1D<double, Stride1D.Dense>) Buffer for the sum</param>
-    //         ///<param name="dim1">(int) First dimension of aView</param>
-    //         ///<param name="dim2">(int) Second dimension of aView</param>
-    //         for (int i = 0; i < dim1; i++)
-    //         {
-    //             for (int j = 0; j < dim2; j++)
-    //             {
-    //                 sum[index] += aView[new Index2D(i, j)];
-    //             }
-    //         }
-    //     }
-
-
-    //     static double[,] kernalTester(Accelerator accelerator, double[,] a, double[,] b)
-    //     {
-    //         var m = a.GetLength(0);
-    //         var ka = a.GetLength(1);
-    //         var kb = b.GetLength(0);
-    //         var n = b.GetLength(1);
-
-    //         var kernal = accelerator.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>>(
-    //             subtwoarrsKernal);
-
-    //         using var aBuffer = accelerator.Allocate2DDenseX<double>(new Index2D(m, ka));
-    //         using var bBuffer = accelerator.Allocate2DDenseX<double>(new Index2D(m, ka));
-    //         using var cBuffer = accelerator.Allocate2DDenseX<double>(new Index2D(m, ka));
-
-    //         aBuffer.CopyFromCPU(a);
-    //         bBuffer.CopyFromCPU(b);
-
-    //         kernal(aBuffer.Extent.ToIntIndex(), aBuffer.View, bBuffer.View, cBuffer.View);
-
-    //         return cBuffer.GetAsArray2D();
-    //     }
-
-    //     static void updateweightskernal(Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> WView,
-    //         ArrayView2D<double, Stride2D.DenseX> MMView,
-    //         ArrayView2D<double, Stride2D.DenseX> DwView,
-    //         double L1,
-    //         double L2,
-    //         double M)
-    //     {
-    //         ///<summary> Update dWBuffer</summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="WView">(ArrayView2D<double, Stride2D.DenseX>) Weight buffer </param>
-    //         ///<param name="MMView">(ArrayView2D<double, Stride2D.DenseX>) Matrix Mul Buffer</param>
-    //         ///<param name="DwView">(ArrayView2D<double, Stride2D.DenseX>) New weight buffer</param>
-    //         ///<param name="L1">(double) L1 penalty</param>
-    //         ///<param name="L2">(double) L2 penalty</param>
-    //         ///<param name="M">(double) Total size of data</param>
-
-    //         if (WView[index] > 0)
-    //         {
-    //             DwView[index] = (((-1 * MMView[new Index2D(index.Y, index.X)] * (2.0 + L1))) + (L2 * WView[index])) / M; //(((-this.multipliedMatrix[z, j] * (2.0 + this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ;
-    //         }
-    //         else
-    //         {
-    //             DwView[index] = (((-1 * MMView[new Index2D(index.Y, index.X)] * (2.0 - L1))) + (L2 * WView[index])) / M; //(((-this.multipliedMatrix[z, j] * (2.0 - this.L1_penality))) + (2 * this.L2_penality * this.W[j, z])) / this.M; ; 
-    //         }
-
-    //     }
-    //     static void additionKernal(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         double addvalue
-    //         )
-    //     {
-    //         ///<summary> Adds a single value to every element in an ArrayView </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer the value is being added to</param>
-    //         ///<param name="addvalue">(double) Value being added to the ArrayView</param>
-    //         aView[index] += addvalue;
-    //     }
-    //     static void multKernal(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         double multvalue
-    //         )
-    //     {
-    //         ///<summary> Adds a single value to every element in an ArrayView </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer the value is being added to</param>
-    //         ///<param name="multvalue">(double) Value being multiplied to every element of the ArrayView</param>
-    //         aView[index] = aView[index] * multvalue;
-    //     }
-
-    //     static void subKernal(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         double subvalue
-    //         )
-    //     {
-    //         ///<summary> Adds a single value to every element in an ArrayView </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer the value is being added to</param>
-    //         ///<param name="subvalue">(double) Value being subtracted to the ArrayView</param>
-    //         aView[index] = aView[index] - subvalue;
-    //     }
-    //     static void divKernal(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         double divvalue
-    //         )
-    //     {
-    //         ///<summary> Adds a single value to every element in an ArrayView </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer the value is being added to</param>
-    //         ///<param name="divvalue">(double) Value being divided from the ArrayView</param>
-    //         aView[index] = aView[index] / divvalue;
-
-
-    //     }
-
-    //     static void subtwoarrsKernal(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         ArrayView2D<double, Stride2D.DenseX> bView,
-    //         ArrayView2D<double, Stride2D.DenseX> cView)
-    //     {
-    //         ///<summary> Subtracts one ArrayView from another, and puts it in a new ArrayView with dimensions reversed (Used for setting up YDiffBuffer) </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer being subtracted from</param>
-    //         ///<param name="bView">(ArrayView2D<double, Stride2D.DenseX>) Buffer being subtracted</param>
-    //         ///<param name="cView">(ArrayView2D<double, Stride2D.DenseX>) Buffer where new value goes</param>
-
-    //         cView[new Index2D(index.Y, index.X)] = aView[index] - bView[index];
-
-    //     }
-    //     static void subtwoarrsKernal2(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         ArrayView2D<double, Stride2D.DenseX> bView)
-    //     {
-    //         ///<summary> Subtracts one ArrayView from another </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) Buffer being subtracted from</param>
-    //         ///<param name="bView">(ArrayView2D<double, Stride2D.DenseX>) Buffer being subtracted</param>
-
-    //         aView[index] = aView[index] - bView[index];
-
-    //     }
-
-    //     static void MatrixMultiplyAcceleratedKernel(
-    //         Index2D index,
-    //         ArrayView2D<double, Stride2D.DenseX> aView,
-    //         ArrayView2D<double, Stride2D.DenseX> bView,
-    //         ArrayView2D<double, Stride2D.DenseX> cView)
-    //     {
-    //         ///<summary> Does Matrix Multiplication on two arrayviews, and then stores in a new arrayview </summary>
-    //         ///<param name="index">(Index2D) Index to iterate through the ArrayView</param>
-    //         ///<param name="aView">(ArrayView2D<double, Stride2D.DenseX>) 1st ArrayView being multiplied</param>
-    //         ///<param name="bView">(ArrayView2D<double, Stride2D.DenseX>) 2nd ArrayView being multiplied</param>
-    //         ///<param name="cView">(ArrayView2D<double, Stride2D.DenseX>) Buffer where new value goes</param>
-    //         var x = index.X;
-    //         var y = index.Y;
-    //         var sum = 0.0;
-    //         for (var i = 0; i < aView.IntExtent.Y; i++)
-    //             sum += aView[new Index2D(x, i)] * bView[new Index2D(i, y)];
-
-    //         cView[index] = sum;
-    //     }
-
-    //     //Predicts outputs based off of x
-    //     double[,] predict(double[,] x)
-    //     ///<summary>Predicts output based off of x</summary>
-    //     ///<param name="x">Array of inputs</param>
-    //     {
-    //         this.accelerate = this.dev.CreateAccelerator(this.context);
-    //         double[,] prediction = applyadd(MatrixMultiplyAccelerated(this.accelerate, x, this.W), this.B);
-    //         this.accelerate.Dispose();
-    //         return prediction;
-    //     }
-
-
-    //     //Used in prediction to move the arrays onto the GPU to set up to be multiplied
-    //     static double[,] MatrixMultiplyAccelerated(Accelerator accelerator, double[,] a, double[,] b)
-    //     {
-    //         var m = a.GetLength(0);
-    //         var ka = a.GetLength(1);
-    //         var kb = b.GetLength(0);
-    //         var n = b.GetLength(1);
-
-    //         if (ka != kb)
-    //             throw new ArgumentException($"Cannot multiply {m}x{ka} matrix by {n}x{kb} matrix", nameof(b));
-
-    //         var kernel = accelerator.LoadAutoGroupedStreamKernel<
-    //             Index2D,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>,
-    //             ArrayView2D<double, Stride2D.DenseX>>(
-    //             MatrixMultiplyAcceleratedKernel);
-
-    //         using var aBuffer = accelerator.Allocate2DDenseX<double>(new Index2D(m, ka));
-    //         using var bBuffer = accelerator.Allocate2DDenseX<double>(new Index2D(ka, n));
-    //         using var cBuffer = accelerator.Allocate2DDenseX<double>(new Index2D(m, n));
-    //         aBuffer.CopyFromCPU(a);
-    //         bBuffer.CopyFromCPU(b);
-
-    //         kernel(cBuffer.Extent.ToIntIndex(), aBuffer.View, bBuffer.View, cBuffer.View);
-    //         return cBuffer.GetAsArray2D();
-    //     }
-    //     //Adds a value to each member of a 2d array
-    //     double[,] applyadd(double[,] arr, double val)
-    //     ///<summary>Adds a value to each member of a 2d array</summary>
-    //     {
-    //         double[,] temp = new double[arr.GetLength(0), arr.GetLength(1)];
-    //         for (int i = 0; i < arr.GetLength(0); i++)
-    //         {
-    //             for (int j = 0; j < arr.GetLength(1); j++)
-    //             {
-    //                 temp[i, j] = arr[i, j] + val;
-    //             }
-    //         }
-    //         return temp;
-
-    //     }
-
-    //     /*
-    //     Lines 494-709 are all methods used for testing the algo, will be deleted on final version
-    //     */
-    //     //Helper function used for testing, prints 1d array
-    //     void print1d(double[] array)
-    //     {
-
-    //         for (int j = 0; j < array.GetLength(0); j++)
-    //         {
-    //             Console.Write("{0} ", array[j]);
-    //         }
-
-    //     }
-    //     //Helper function used for testing, prints 2d array
-    //     void print2d(double[,] array)
-    //     {
-    //         Console.Write("[");
-    //         for (int i = 0; i < array.GetLength(0); i++)
-    //         {
-    //             Console.Write("[");
-    //             for (int j = 0; j < array.GetLength(1); j++)
-    //             {
-    //                 Console.Write("{0}, ", array[i, j]);
-    //             }
-    //             Console.Write("]");
-    //             Console.Write(", ");
-    //         }
-    //         Console.WriteLine("]");
-    //     }
-
-
         void writetoCSV(double[,] array, string path, string inorout)
         {
             StreamWriter file = new StreamWriter(path);
@@ -2963,7 +2343,7 @@ namespace ElasticNetRegression
             ElasticNet e1 = new ElasticNet();
             ElasticNet e3 = new ElasticNet();
             
-            e1.test(6,5);
+            //e1.test(6,5);
            
             // aa.Dispose();
 
